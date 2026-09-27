@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
-import { UserPlus, X, Shield, ShieldCheck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { UserPlus, X, Shield, ShieldCheck, Warehouse as WarehouseIcon, Trash2 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 
 export default function UsersPage() {
@@ -32,6 +32,15 @@ export default function UsersPage() {
       toast.success(`User ${user.status === 'active' ? 'deactivated' : 'activated'}`);
       fetchUsers();
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed'); }
+  };
+
+  const deleteUser = async (user: any) => {
+    if (!window.confirm(`Are you sure you want to delete user ${user.name}? This action cannot be undone.`)) return;
+    try {
+      await api.delete(`/users/${user.id}`);
+      toast.success(`User ${user.name} deleted`);
+      fetchUsers();
+    } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed to delete user'); }
   };
 
   const roleIcon = (role: string) => {
@@ -76,9 +85,14 @@ export default function UsersPage() {
                   <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${u.status === 'active' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>{u.status}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
-                    {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                  </button>
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
+                      {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button onClick={() => deleteUser(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

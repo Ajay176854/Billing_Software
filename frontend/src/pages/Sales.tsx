@@ -35,7 +35,7 @@ export default function Sales() {
     setLoading(false);
   };
 
-  useEffect(() => { const t = setTimeout(fetchSales, 300); return () => clearTimeout(t); }, [search, paymentFilter, statusFilter, startDate, endDate]);
+  useEffect(() => { fetchSales(); }, [search, paymentFilter, statusFilter, startDate, endDate]);
 
   const statusBadge = (s: string) => {
     if (s === 'completed') return <span className="inline-block rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">Completed</span>;

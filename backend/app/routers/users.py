@@ -6,8 +6,11 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
+from sqlalchemy.exc import IntegrityError
 from app.auth import require_role, hash_password
 from app.models.user import User
+from app.models.sale import Sale
+from app.models.stock_transaction import StockTransaction
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, PasswordReset
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -83,3 +86,27 @@ def reset_password(user_id: int, data: PasswordReset, db: Session = Depends(get_
     user.password_hash = hash_password(data.new_password)
     db.commit()
     return {"message": "Password reset successfully"}
+
+
+@router.delete("/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user=Depends(require_role("admin"))):
+    """Delete a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+        
+    try:
+        # Reassign associated records to the admin performing the deletion to preserve history
+        db.query(Sale).filter(Sale.user_id == user_id).update({"user_id": current_user.id})
+        db.query(StockTransaction).filter(StockTransaction.user_id == user_id).update({"user_id": current_user.id})
+        
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to delete user: {str(e)}")
+        
+    return {"message": "User deleted successfully"}

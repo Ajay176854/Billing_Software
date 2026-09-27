@@ -70,7 +70,8 @@ def list_products(
     else:
         query = query.filter(Product.status == "active")
 
-    products = query.order_by(Product.name).all()
+    from sqlalchemy.orm import joinedload
+    products = query.options(joinedload(Product.category)).order_by(Product.name).all()
     result = [_product_to_response(p) for p in products]
     cache.set(cache_key, result, ttl=300) # 5 min cache
     return result

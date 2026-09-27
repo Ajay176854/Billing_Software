@@ -91,7 +91,8 @@ def customer_detail(
     from app.models.sale_item import SaleItem
     from app.models.product import Product
 
-    sales = db.query(Sale).filter(
+    from sqlalchemy.orm import joinedload
+    sales = db.query(Sale).options(joinedload(Sale.items).joinedload(SaleItem.product)).filter(
         Sale.customer_phone == phone,
         Sale.status == "completed"
     ).order_by(Sale.created_at.desc()).all()

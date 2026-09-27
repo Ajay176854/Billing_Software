@@ -72,7 +72,7 @@ export default function Products() {
   };
 
   useEffect(() => { fetchCategories(); }, []);
-  useEffect(() => { const t = setTimeout(fetchProducts, 300); return () => clearTimeout(t); }, [search, catFilter]);
+  useEffect(() => { fetchProducts(); }, [search, catFilter]);
 
   const openAdd = () => {
     setEditing(null);

@@ -1,8 +1,24 @@
 import axios from 'axios';
+import { setupCache } from 'axios-cache-interceptor';
 
-const api = axios.create({
+const instance = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+});
+
+// Wrap axios with automatic caching for GET requests (15s TTL)
+const api = setupCache(instance, {
+  ttl: 15 * 1000,
+  methods: ['get']
+});
+
+api.interceptors.response.use((response) => {
+  if (response.config.method && ['post', 'put', 'delete', 'patch'].includes(response.config.method)) {
+    // We can wipe the local cache store on successful mutation
+    // @ts-ignore - clear() exists on MemoryStorage but isn't on the base AxiosStorage type
+    if (typeof api.storage.clear === 'function') api.storage.clear();
+  }
+  return response;
 });
 
 // JWT interceptor

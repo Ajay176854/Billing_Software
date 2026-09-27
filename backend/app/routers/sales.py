@@ -40,7 +40,8 @@ def list_sales(
     if status_filter:
         query = query.filter(Sale.status == status_filter)
 
-    sales = query.order_by(Sale.created_at.desc()).limit(limit).all()
+    from sqlalchemy.orm import joinedload
+    sales = query.options(joinedload(Sale.user), joinedload(Sale.items)).order_by(Sale.created_at.desc()).limit(limit).all()
 
     return [
         SaleListResponse(

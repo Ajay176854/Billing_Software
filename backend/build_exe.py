@@ -41,7 +41,7 @@ def build_executable():
     # Using shell=True on Windows is sometimes necessary for PyInstaller to be found in Scripts
     subprocess.check_call(" ".join(args), shell=True, cwd=str(backend_dir))
     
-    print("\n✅ Build complete! The executable is located in the 'dist' folder.")
+    print("\n[OK] Build complete! The executable is located in the 'dist' folder.")
 
 if __name__ == "__main__":
     build_executable()

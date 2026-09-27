@@ -53,6 +53,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API Caching Middleware for speed
+from app.middleware import QueryCacheMiddleware
+app.add_middleware(QueryCacheMiddleware)
+
 # Mount all routers under /api
 from app.routers import auth, users, products, categories, inventory, billing, sales, reports, settings as settings_router, backup
 
@@ -67,6 +71,44 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 
+
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+import logging
+
+# Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Centralized Error Handlers
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    error_msg = ", ".join([f"{err['loc'][-1]}: {err['msg']}" for err in errors]) if errors else str(exc)
+    return JSONResponse(
+        status_code=400,
+        content={"success": False, "error": {"message": error_msg, "statusCode": 400}},
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"success": False, "error": {"message": exc.detail, "statusCode": exc.status_code}},
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logging.error(f"Unhandled Exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"success": False, "error": {"message": "Internal Server Error", "statusCode": 500}},
+    )
 
 @app.get("/api/health")
 def health_check():

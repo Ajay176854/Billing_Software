@@ -42,7 +42,8 @@ def adjust(
 @router.get("/low-stock", response_model=List[ProductResponse])
 def low_stock_products(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """Get products below their reorder level."""
-    products = db.query(Product).filter(
+    from sqlalchemy.orm import joinedload
+    products = db.query(Product).options(joinedload(Product.category)).filter(
         Product.status == "active",
         Product.stock_qty > 0,
         Product.stock_qty <= Product.reorder_level,
@@ -53,7 +54,8 @@ def low_stock_products(db: Session = Depends(get_db), current_user=Depends(get_c
 @router.get("/out-of-stock", response_model=List[ProductResponse])
 def out_of_stock_products(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """Get products with zero stock."""
-    products = db.query(Product).filter(
+    from sqlalchemy.orm import joinedload
+    products = db.query(Product).options(joinedload(Product.category)).filter(
         Product.status == "active",
         Product.stock_qty == 0,
     ).order_by(Product.name).all()
@@ -76,7 +78,8 @@ def stock_transactions(
     if type:
         query = query.filter(StockTransaction.type == type)
 
-    txns = query.order_by(StockTransaction.created_at.desc()).limit(limit).all()
+    from sqlalchemy.orm import joinedload
+    txns = query.options(joinedload(StockTransaction.product), joinedload(StockTransaction.user)).order_by(StockTransaction.created_at.desc()).limit(limit).all()
 
     return [
         StockTransactionResponse(
