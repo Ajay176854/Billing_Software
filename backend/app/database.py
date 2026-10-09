@@ -20,8 +20,16 @@ else:
         "pool_recycle": 1800,
     })
 
+db_url = settings.DATABASE_URL
+# Vercel AWS Lambda often crashes with psycopg2 due to missing libpq binaries.
+# We auto-switch to pg8000 (a pure python driver) if it's a postgresql URL.
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    db_url,
     connect_args=connect_args,
     **engine_kwargs
 )
