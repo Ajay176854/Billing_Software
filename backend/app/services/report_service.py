@@ -135,44 +135,54 @@ def get_dashboard_stats(db: Session) -> dict:
 
 def get_sales_by_date_range(db: Session, start_date: datetime, end_date: datetime) -> list:
     """Get daily sales summary for a date range."""
-    # Offset by IST (+5:30) so func.date correctly groups by the local date
-    local_created_at = Sale.created_at + timedelta(hours=5, minutes=30)
-
-    sales = db.query(
-        func.date(local_created_at).label("date"),
-        func.sum(Sale.total).label("total_sales"),
-        func.count(Sale.id).label("total_bills"),
-        func.sum(Sale.discount).label("total_discount"),
-        func.sum(Sale.tax).label("total_tax"),
+    # Fetch all relevant sales with items and products for cost calculation
+    from sqlalchemy.orm import joinedload
+    sales = db.query(Sale).options(
+        joinedload(Sale.items).joinedload(SaleItem.product)
     ).filter(
         Sale.created_at >= start_date,
         Sale.created_at <= end_date,
         Sale.status == "completed",
-    ).group_by(func.date(local_created_at)).order_by(func.date(local_created_at)).all()
+    ).order_by(Sale.created_at).all()
 
-    # Calculate daily cost to compute profit
-    cost_query = db.query(
-        func.date(local_created_at).label("date"),
-        func.sum(SaleItem.quantity * Product.purchase_price).label("total_cost")
-    ).select_from(SaleItem).join(Sale, Sale.id == SaleItem.sale_id).join(Product, Product.id == SaleItem.product_id).filter(
-        Sale.created_at >= start_date,
-        Sale.created_at <= end_date,
-        Sale.status == "completed",
-    ).group_by(func.date(local_created_at)).all()
+    daily_stats = {}
     
-    cost_map = {str(r.date): float(r.total_cost or 0) for r in cost_query}
+    for s in sales:
+        # Offset by IST (+5:30) 
+        local_date = (s.created_at + timedelta(hours=5, minutes=30)).date()
+        date_str = str(local_date)
+        
+        if date_str not in daily_stats:
+            daily_stats[date_str] = {
+                "total_sales": 0.0,
+                "total_bills": 0,
+                "total_discount": 0.0,
+                "total_tax": 0.0,
+                "total_cost": 0.0
+            }
+            
+        stats = daily_stats[date_str]
+        stats["total_sales"] += float(s.total)
+        stats["total_bills"] += 1
+        stats["total_discount"] += float(s.discount)
+        stats["total_tax"] += float(s.tax)
+        
+        for item in s.items:
+            if item.product:
+                stats["total_cost"] += float(item.quantity) * float(item.product.purchase_price)
 
-    return [
-        {
-            "date": str(s.date),
-            "total_sales": float(s.total_sales),
-            "total_bills": int(s.total_bills),
-            "total_discount": float(s.total_discount),
-            "total_tax": float(s.total_tax),
-            "total_profit": float(s.total_sales) - float(s.total_tax) - cost_map.get(str(s.date), 0.0),
-        }
-        for s in sales
-    ]
+    result = []
+    for date_str, stats in daily_stats.items():
+        result.append({
+            "date": date_str,
+            "total_sales": stats["total_sales"],
+            "total_bills": stats["total_bills"],
+            "total_discount": stats["total_discount"],
+            "total_tax": stats["total_tax"],
+            "total_profit": stats["total_sales"] - stats["total_tax"] - stats["total_cost"],
+        })
+        
+    return result
 
 
 def get_product_sales_report(db: Session, start_date: datetime = None, end_date: datetime = None) -> list:
@@ -310,81 +320,76 @@ def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "o
     period: 'daily' or 'monthly'
     group_by: 'overall' or 'product'
     """
-    local_created_at = Sale.created_at + timedelta(hours=5, minutes=30)
+    from sqlalchemy.orm import joinedload
+    sales_query = db.query(Sale).options(
+        joinedload(Sale.items).joinedload(SaleItem.product)
+    ).filter(Sale.status == "completed")
     
-    if period == "monthly":
-        date_expr = func.strftime('%Y-%m', local_created_at)
-    else:
-        date_expr = func.date(local_created_at)
-
-    if group_by == "overall":
-        # Cost subquery
-        cost_query = db.query(
-            date_expr.label("period_date"),
-            func.sum(SaleItem.quantity * Product.purchase_price).label("total_cost")
-        ).select_from(SaleItem).join(Sale, Sale.id == SaleItem.sale_id).join(Product, Product.id == SaleItem.product_id).filter(
-            Sale.status == "completed"
-        )
-        if start_date:
-            cost_query = cost_query.filter(Sale.created_at >= start_date)
-        if end_date:
-            cost_query = cost_query.filter(Sale.created_at <= end_date)
-        cost_query = cost_query.group_by(date_expr).all()
-        cost_map = {str(r.period_date): float(r.total_cost or 0) for r in cost_query}
-
-        # Main query
-        sales = db.query(
-            date_expr.label("period_date"),
-            func.sum(Sale.total).label("total_sales"),
-            func.count(Sale.id).label("total_bills"),
-            func.sum(Sale.tax).label("total_tax"),
-        ).filter(
-            Sale.status == "completed"
-        )
-        if start_date:
-            sales = sales.filter(Sale.created_at >= start_date)
-        if end_date:
-            sales = sales.filter(Sale.created_at <= end_date)
+    if start_date:
+        sales_query = sales_query.filter(Sale.created_at >= start_date)
+    if end_date:
+        sales_query = sales_query.filter(Sale.created_at <= end_date)
+        
+    sales = sales_query.order_by(Sale.created_at).all()
+    
+    results_map = {}
+    
+    for s in sales:
+        local_time = s.created_at + timedelta(hours=5, minutes=30)
+        
+        if period == "monthly":
+            period_str = local_time.strftime('%Y-%m')
+        else:
+            period_str = local_time.strftime('%Y-%m-%d')
             
-        sales = sales.group_by(date_expr).order_by(date_expr).all()
-
-        return [
-            {
-                "date": str(s.period_date),
-                "total_sales": float(s.total_sales or 0),
-                "total_bills": int(s.total_bills or 0),
-                "total_profit": float(s.total_sales or 0) - float(s.total_tax or 0) - cost_map.get(str(s.period_date), 0.0),
-            }
-            for s in sales
-        ]
+        if group_by == "overall":
+            if period_str not in results_map:
+                results_map[period_str] = {
+                    "total_sales": 0.0,
+                    "total_bills": 0,
+                    "total_tax": 0.0,
+                    "total_cost": 0.0
+                }
+            r = results_map[period_str]
+            r["total_sales"] += float(s.total)
+            r["total_bills"] += 1
+            r["total_tax"] += float(s.tax)
+            
+            for item in s.items:
+                if item.product:
+                    r["total_cost"] += float(item.quantity) * float(item.product.purchase_price)
+                    
+        else: # group_by == "product"
+            for item in s.items:
+                if not item.product:
+                    continue
+                    
+                key = f"{period_str}_{item.product_id}"
+                if key not in results_map:
+                    results_map[key] = {
+                        "date": period_str,
+                        "product_id": item.product_id,
+                        "product_name": item.product.name,
+                        "qty_sold": 0,
+                        "revenue": 0.0,
+                        "profit": 0.0
+                    }
+                r = results_map[key]
+                r["qty_sold"] += item.quantity
+                revenue = float(item.unit_price * item.quantity) - float(item.discount)
+                r["revenue"] += revenue
+                cost = float(item.product.purchase_price * item.quantity)
+                r["profit"] += (revenue - cost)
+                
+    if group_by == "overall":
+        output = []
+        for p_str, r in results_map.items():
+            output.append({
+                "date": p_str,
+                "total_sales": r["total_sales"],
+                "total_bills": r["total_bills"],
+                "total_profit": r["total_sales"] - r["total_tax"] - r["total_cost"]
+            })
+        return output
     else:
-        # group_by == "product"
-        query = db.query(
-            date_expr.label("period_date"),
-            Product.id.label("product_id"),
-            Product.name.label("product_name"),
-            func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
-            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
-            func.coalesce(func.sum((SaleItem.unit_price * SaleItem.quantity) - SaleItem.discount - (Product.purchase_price * SaleItem.quantity)), 0).label("profit"),
-        ).join(SaleItem, SaleItem.product_id == Product.id).join(
-            Sale, Sale.id == SaleItem.sale_id
-        ).filter(Sale.status == "completed")
-
-        if start_date:
-            query = query.filter(Sale.created_at >= start_date)
-        if end_date:
-            query = query.filter(Sale.created_at <= end_date)
-
-        results = query.group_by(date_expr, Product.id, Product.name).order_by(date_expr, Product.name).all()
-
-        return [
-            {
-                "date": str(r.period_date),
-                "product_id": r.product_id,
-                "product_name": r.product_name,
-                "qty_sold": int(r.qty_sold),
-                "revenue": float(r.revenue),
-                "profit": float(r.profit),
-            }
-            for r in results
-        ]
+        return list(results_map.values())
