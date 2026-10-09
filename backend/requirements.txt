@@ -9,3 +9,4 @@ bcrypt
 python-multipart
 aiofiles
 psycopg2-binary
+slowapi
