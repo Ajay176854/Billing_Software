@@ -61,7 +61,7 @@ app = FastAPI(
 # CORS — allow React dev server and production domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(',')],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
