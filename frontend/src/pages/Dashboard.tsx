@@ -229,10 +229,10 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#0f172a', fontSize: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-                  formatter={(value: number) => [fmt(value), 'Sales']}
-                />
+                  <Tooltip
+                    contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#0f172a', fontSize: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                    formatter={(value: any) => [fmt(value), 'Sales']}
+                  />
                 <Area type="monotone" dataKey="total_sales" stroke="#4f46e5" fill="url(#salesGradient)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>

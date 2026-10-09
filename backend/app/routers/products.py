@@ -73,7 +73,7 @@ def list_products(
     from sqlalchemy.orm import joinedload
     products = query.options(joinedload(Product.category)).order_by(Product.name).all()
     result = [_product_to_response(p) for p in products]
-    cache.set(cache_key, result, ttl=300) # 5 min cache
+    cache.set(cache_key, result, ttl=300)  # 5 min cache
     return result
 
 
@@ -86,7 +86,7 @@ def get_next_code(
 ):
     """Generate next unique barcode/SKU based on prefix or category."""
     actual_prefix = "PRD"
-    
+
     if prefix:
         actual_prefix = prefix.strip().upper()
     elif category_id:
@@ -103,7 +103,7 @@ def get_next_code(
     products = db.query(Product).filter(
         or_(Product.barcode.like(like_pattern), Product.sku.like(like_pattern))
     ).all()
-    
+
     max_num = 0
     for p in products:
         for code in [p.barcode, p.sku]:
@@ -114,10 +114,10 @@ def get_next_code(
                         max_num = num
                 except ValueError:
                     pass
-                    
+
     next_num = max_num + 1
     next_code = f"{actual_prefix}-{next_num:03d}"
-    
+
     return {"prefix": actual_prefix, "next_code": next_code}
 
 
@@ -138,7 +138,7 @@ def lookup_barcode(barcode: str, db: Session = Depends(get_db), current_user=Dep
         raise HTTPException(status_code=404, detail=f"No product found with barcode or SKU: {barcode}")
 
     result = _product_to_response(product)
-    cache.set(cache_key, result, ttl=3600) # 1 hour cache for barcode lookups
+    cache.set(cache_key, result, ttl=3600)  # 1 hour cache for barcode lookups
     return result
 
 
@@ -182,7 +182,7 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db), current_u
         db.add(txn)
         db.commit()
 
-    cache.clear() # Invalidate cache
+    cache.clear()  # Invalidate cache
     return _product_to_response(product)
 
 
@@ -217,7 +217,7 @@ def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(g
 
     db.commit()
     db.refresh(product)
-    cache.clear() # Invalidate cache
+    cache.clear()  # Invalidate cache
     return _product_to_response(product)
 
 
@@ -233,5 +233,5 @@ def delete_product(
         raise HTTPException(status_code=404, detail="Product not found")
     product.status = "inactive"
     db.commit()
-    cache.clear() # Invalidate cache
+    cache.clear()  # Invalidate cache
     return None

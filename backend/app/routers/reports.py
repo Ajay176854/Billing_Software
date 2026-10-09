@@ -14,14 +14,17 @@ from app.services.report_service import (
     get_product_sales_report,
     get_itemized_sales_report,
     get_customer_traffic_report,
+    get_monitoring_report,
 )
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
 
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """Get dashboard overview statistics."""
     return get_dashboard_stats(db)
+
 
 @router.get("/sales-by-date")
 def sales_by_date(
@@ -43,6 +46,7 @@ def sales_by_date(
 
     return get_sales_by_date_range(db, start, end)
 
+
 @router.get("/product-sales")
 def product_sales(
     start_date: Optional[str] = None,
@@ -55,6 +59,7 @@ def product_sales(
     end = datetime.fromisoformat(end_date) if end_date else None
     return get_product_sales_report(db, start, end)
 
+
 @router.get("/itemized-sales")
 def itemized_sales(
     start_date: Optional[str] = None,
@@ -66,6 +71,7 @@ def itemized_sales(
     start = datetime.fromisoformat(start_date) if start_date else None
     end = datetime.fromisoformat(end_date) if end_date else None
     return get_itemized_sales_report(db, start, end)
+
 
 @router.get("/customer-traffic")
 def customer_traffic(
@@ -80,6 +86,21 @@ def customer_traffic(
     return get_customer_traffic_report(db, start, end)
 
 
+@router.get("/monitoring")
+def monitoring(
+    period: str = Query("daily", regex="^(daily|monthly)$"),
+    group_by: str = Query("overall", regex="^(overall|product)$"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get monitoring trends (daily/monthly, overall/product)."""
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    return get_monitoring_report(db, period, group_by, start, end)
+
+
 @router.get("/customer-detail")
 def customer_detail(
     phone: str = Query(...),
@@ -89,7 +110,6 @@ def customer_detail(
     """Get full purchase history for a specific customer by phone number."""
     from app.models.sale import Sale
     from app.models.sale_item import SaleItem
-    from app.models.product import Product
 
     from sqlalchemy.orm import joinedload
     sales = db.query(Sale).options(joinedload(Sale.items).joinedload(SaleItem.product)).filter(

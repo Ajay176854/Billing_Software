@@ -39,7 +39,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def get_current_user(
     request: Request,
-    token: Optional[str] = Depends(oauth2_scheme), 
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
     """Decode JWT and return the current user. Raises 401 if invalid."""

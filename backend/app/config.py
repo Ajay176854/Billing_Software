@@ -2,23 +2,24 @@
 Billing Software Backend - Application Configuration
 """
 from pydantic_settings import BaseSettings
-from pathlib import Path
-import secrets
 
 
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Retail Billing & Inventory Management"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql://postgres.obgjwzsthcsculzmikvp:Ajaiashwa%402004@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
+    # Database - Default to local SQLite, override in .env for production
+    DATABASE_URL: str = "sqlite:///./billing.db"
 
-    # JWT Authentication
+    # JWT Authentication - Override in .env for production
     SECRET_KEY: str = "729a4a7538a7c2980c58e657a79a6136d4df6a929fb0740632b6946e3ed9fb71"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
+
+    # CORS
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     # Default Admin
     DEFAULT_ADMIN_USERNAME: str = "admin"
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
     CURRENCY_CODE: str = "INR"
 
     class Config:
+        env_file = ".env"
         extra = "allow"
 
 

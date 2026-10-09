@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from sqlalchemy.exc import IntegrityError
 from app.auth import require_role, hash_password
 from app.models.user import User
 from app.models.sale import Sale
@@ -94,19 +93,19 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user=Depend
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
+
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-        
+
     try:
         # Reassign associated records to the admin performing the deletion to preserve history
         db.query(Sale).filter(Sale.user_id == user_id).update({"user_id": current_user.id})
         db.query(StockTransaction).filter(StockTransaction.user_id == user_id).update({"user_id": current_user.id})
-        
+
         db.delete(user)
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to delete user: {str(e)}")
-        
+
     return {"message": "User deleted successfully"}

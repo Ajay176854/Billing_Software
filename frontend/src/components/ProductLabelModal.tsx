@@ -18,29 +18,47 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, onClose, 
     if (printRef.current) {
       const printContent = printRef.current.innerHTML;
       
-      const printWindow = window.open('', '', 'height=600,width=800');
-      if (printWindow) {
-        printWindow.document.write('<html><head><title>Print Label</title>');
-        printWindow.document.write('<style>');
-        printWindow.document.write(`
+      // Create a hidden iframe for printing to avoid 'about:blank' popup issues in PyWebView
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      const iframeDoc = iframe.contentWindow?.document;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print Label</title>');
+        iframeDoc.write('<style>');
+        iframeDoc.write(`
           body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
           .label-container { border: 1px dashed #ccc; padding: 20px; display: inline-block; }
           .product-name { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; }
           .qr-code { margin-bottom: 10px; }
           @media print {
-            body { margin: 0; padding: 0; }
-            .label-container { border: none; padding: 0; }
+            @page { margin: 0; size: auto; }
+            body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .label-container { border: none; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; page-break-inside: avoid; }
+            /* Ensure barcode and QR codes render crisply on thermal printers */
+            svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
           }
         `);
-        printWindow.document.write('</style></head><body>');
-        printWindow.document.write(printContent);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.focus();
-        // slight delay for rendering
+        iframeDoc.write('</style></head><body>');
+        iframeDoc.write(printContent);
+        iframeDoc.write('</body></html>');
+        iframeDoc.close();
+        
+        // Wait for rendering
         setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          // Cleanup iframe after printing
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
         }, 250);
       }
     }

@@ -3,13 +3,11 @@ Report Service — business intelligence queries.
 """
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func
 
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.product import Product
-from app.models.category import Category
-from app.models.stock_transaction import StockTransaction
 
 
 def get_dashboard_stats(db: Session) -> dict:
@@ -139,7 +137,7 @@ def get_sales_by_date_range(db: Session, start_date: datetime, end_date: datetim
     """Get daily sales summary for a date range."""
     # Offset by IST (+5:30) so func.date correctly groups by the local date
     local_created_at = Sale.created_at + timedelta(hours=5, minutes=30)
-    
+
     sales = db.query(
         func.date(local_created_at).label("date"),
         func.sum(Sale.total).label("total_sales"),
@@ -152,6 +150,18 @@ def get_sales_by_date_range(db: Session, start_date: datetime, end_date: datetim
         Sale.status == "completed",
     ).group_by(func.date(local_created_at)).order_by(func.date(local_created_at)).all()
 
+    # Calculate daily cost to compute profit
+    cost_query = db.query(
+        func.date(local_created_at).label("date"),
+        func.sum(SaleItem.quantity * Product.purchase_price).label("total_cost")
+    ).select_from(SaleItem).join(Sale, Sale.id == SaleItem.sale_id).join(Product, Product.id == SaleItem.product_id).filter(
+        Sale.created_at >= start_date,
+        Sale.created_at <= end_date,
+        Sale.status == "completed",
+    ).group_by(func.date(local_created_at)).all()
+    
+    cost_map = {str(r.date): float(r.total_cost or 0) for r in cost_query}
+
     return [
         {
             "date": str(s.date),
@@ -159,6 +169,7 @@ def get_sales_by_date_range(db: Session, start_date: datetime, end_date: datetim
             "total_bills": int(s.total_bills),
             "total_discount": float(s.total_discount),
             "total_tax": float(s.total_tax),
+            "total_profit": float(s.total_sales) - float(s.total_tax) - cost_map.get(str(s.date), 0.0),
         }
         for s in sales
     ]
@@ -172,6 +183,7 @@ def get_product_sales_report(db: Session, start_date: datetime = None, end_date:
         Product.barcode,
         func.coalesce(func.sum(SaleItem.quantity), 0).label("total_qty_sold"),
         func.coalesce(func.sum(SaleItem.subtotal), 0).label("total_revenue"),
+        func.coalesce(func.sum((SaleItem.unit_price * SaleItem.quantity) - SaleItem.discount - (Product.purchase_price * SaleItem.quantity)), 0).label("total_profit"),
     ).join(SaleItem, SaleItem.product_id == Product.id).join(
         Sale, Sale.id == SaleItem.sale_id
     ).filter(Sale.status == "completed")
@@ -192,14 +204,16 @@ def get_product_sales_report(db: Session, start_date: datetime = None, end_date:
             "barcode": r.barcode,
             "total_qty_sold": int(r.total_qty_sold),
             "total_revenue": float(r.total_revenue),
+            "total_profit": float(r.total_profit),
         }
         for r in results
     ]
 
+
 def get_itemized_sales_report(db: Session, start_date: datetime = None, end_date: datetime = None) -> list:
     """Get itemized sales report (every single item sold with invoice details)."""
     local_created_at = Sale.created_at + timedelta(hours=5, minutes=30)
-    
+
     query = db.query(
         local_created_at.label("local_time"),
         Sale.invoice_no,
@@ -209,6 +223,7 @@ def get_itemized_sales_report(db: Session, start_date: datetime = None, end_date
         SaleItem.unit_price.label("price"),
         SaleItem.tax,
         SaleItem.subtotal,
+        ((SaleItem.unit_price * SaleItem.quantity) - SaleItem.discount - (Product.purchase_price * SaleItem.quantity)).label("profit")
     ).join(SaleItem, Sale.id == SaleItem.sale_id).join(
         Product, SaleItem.product_id == Product.id
     ).filter(Sale.status == "completed")
@@ -230,6 +245,7 @@ def get_itemized_sales_report(db: Session, start_date: datetime = None, end_date
             "price": float(r.price),
             "tax": float(r.tax),
             "total": float(r.subtotal) + float(r.tax),
+            "profit": float(r.profit) if r.profit is not None else 0.0,
         }
         for r in results
     ]
@@ -237,15 +253,9 @@ def get_itemized_sales_report(db: Session, start_date: datetime = None, end_date
 
 def get_customer_traffic_report(db: Session, start_date: datetime = None, end_date: datetime = None) -> list:
     """Get customer traffic report: top customers by purchase frequency and volume."""
-    query = db.query(
-        Sale.customer_phone,
-        Sale.customer_name,
-        func.count(Sale.id).label("total_visits"),
-        func.sum(Sale.total).label("total_spent"),
-        func.max(Sale.created_at).label("last_visit")
-    ).filter(
+    query = db.query(Sale).filter(
         Sale.status == "completed",
-        Sale.customer_phone != None,
+        Sale.customer_phone.is_not(None),
         Sale.customer_phone != ""
     )
 
@@ -254,17 +264,127 @@ def get_customer_traffic_report(db: Session, start_date: datetime = None, end_da
     if end_date:
         query = query.filter(Sale.created_at <= end_date)
 
-    results = query.group_by(Sale.customer_phone, Sale.customer_name).order_by(
-        func.sum(Sale.total).desc()
-    ).all()
+    sales = query.all()
+    
+    customers = {}
+    for s in sales:
+        phone = s.customer_phone
+        if phone not in customers:
+            customers[phone] = {
+                "names": set(),
+                "total_visits": 0,
+                "total_spent": 0.0,
+                "last_visit": None,
+            }
+        
+        c = customers[phone]
+        if s.customer_name:
+            c["names"].add(s.customer_name)
+        c["total_visits"] += 1
+        c["total_spent"] += float(s.total)
+        
+        if not c["last_visit"] or (s.created_at and s.created_at > c["last_visit"]):
+            c["last_visit"] = s.created_at
+            
+    results = []
+    for phone, data in customers.items():
+        # Combine all names used for this phone number
+        name_list = sorted(list(data["names"]))
+        name_str = " / ".join(name_list) if name_list else "Unknown"
+        results.append({
+            "customer_phone": phone,
+            "customer_name": name_str,
+            "total_visits": data["total_visits"],
+            "total_spent": data["total_spent"],
+            "last_visit": data["last_visit"].isoformat() if data["last_visit"] else None
+        })
+        
+    # Sort by total_spent descending
+    results.sort(key=lambda x: x["total_spent"], reverse=True)
+    return results
 
-    return [
-        {
-            "customer_phone": r.customer_phone,
-            "customer_name": r.customer_name,
-            "total_visits": int(r.total_visits),
-            "total_spent": float(r.total_spent),
-            "last_visit": r.last_visit.isoformat() if r.last_visit else None,
-        }
-        for r in results
-    ]
+
+def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "overall", start_date: datetime = None, end_date: datetime = None) -> list:
+    """
+    Get time-series monitoring data.
+    period: 'daily' or 'monthly'
+    group_by: 'overall' or 'product'
+    """
+    local_created_at = Sale.created_at + timedelta(hours=5, minutes=30)
+    
+    if period == "monthly":
+        date_expr = func.strftime('%Y-%m', local_created_at)
+    else:
+        date_expr = func.date(local_created_at)
+
+    if group_by == "overall":
+        # Cost subquery
+        cost_query = db.query(
+            date_expr.label("period_date"),
+            func.sum(SaleItem.quantity * Product.purchase_price).label("total_cost")
+        ).select_from(SaleItem).join(Sale, Sale.id == SaleItem.sale_id).join(Product, Product.id == SaleItem.product_id).filter(
+            Sale.status == "completed"
+        )
+        if start_date:
+            cost_query = cost_query.filter(Sale.created_at >= start_date)
+        if end_date:
+            cost_query = cost_query.filter(Sale.created_at <= end_date)
+        cost_query = cost_query.group_by(date_expr).all()
+        cost_map = {str(r.period_date): float(r.total_cost or 0) for r in cost_query}
+
+        # Main query
+        sales = db.query(
+            date_expr.label("period_date"),
+            func.sum(Sale.total).label("total_sales"),
+            func.count(Sale.id).label("total_bills"),
+            func.sum(Sale.tax).label("total_tax"),
+        ).filter(
+            Sale.status == "completed"
+        )
+        if start_date:
+            sales = sales.filter(Sale.created_at >= start_date)
+        if end_date:
+            sales = sales.filter(Sale.created_at <= end_date)
+            
+        sales = sales.group_by(date_expr).order_by(date_expr).all()
+
+        return [
+            {
+                "date": str(s.period_date),
+                "total_sales": float(s.total_sales or 0),
+                "total_bills": int(s.total_bills or 0),
+                "total_profit": float(s.total_sales or 0) - float(s.total_tax or 0) - cost_map.get(str(s.period_date), 0.0),
+            }
+            for s in sales
+        ]
+    else:
+        # group_by == "product"
+        query = db.query(
+            date_expr.label("period_date"),
+            Product.id.label("product_id"),
+            Product.name.label("product_name"),
+            func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
+            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
+            func.coalesce(func.sum((SaleItem.unit_price * SaleItem.quantity) - SaleItem.discount - (Product.purchase_price * SaleItem.quantity)), 0).label("profit"),
+        ).join(SaleItem, SaleItem.product_id == Product.id).join(
+            Sale, Sale.id == SaleItem.sale_id
+        ).filter(Sale.status == "completed")
+
+        if start_date:
+            query = query.filter(Sale.created_at >= start_date)
+        if end_date:
+            query = query.filter(Sale.created_at <= end_date)
+
+        results = query.group_by(date_expr, Product.id, Product.name).order_by(date_expr, Product.name).all()
+
+        return [
+            {
+                "date": str(r.period_date),
+                "product_id": r.product_id,
+                "product_name": r.product_name,
+                "qty_sold": int(r.qty_sold),
+                "revenue": float(r.revenue),
+                "profit": float(r.profit),
+            }
+            for r in results
+        ]

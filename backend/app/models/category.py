@@ -11,6 +11,6 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False)
-    prefix = Column(String(10), nullable=True) # E.g., BGL for Bangle
+    prefix = Column(String(10), nullable=True)  # E.g., BGL for Bangle
     status = Column(String(20), nullable=False, default="active")  # active, inactive
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

@@ -2,6 +2,16 @@
 Retail Billing & Inventory Management Software
 FastAPI Application Entry Point
 """
+import sys
+import logging
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi import Request
+from app.routers import auth, users, products, categories, inventory, billing, sales, reports, settings as settings_router, backup
+from app.middleware import QueryCacheMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,8 +22,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi import HTTPException
 
 from app.config import settings
-from app.database import engine, SessionLocal, Base
-from app.models import *  # noqa: F401 — register all models with SQLAlchemy
+from app.database import SessionLocal
+from app.models import *  # noqa: F401, F403 — register all models with SQLAlchemy
 from app.utils.seed import seed_database
 
 
@@ -24,9 +34,12 @@ async def lifespan(app: FastAPI):
     data_dir = Path(__file__).resolve().parent.parent / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create all tables
+    # Migrations are now handled by Alembic
+    # Run `alembic upgrade head` before starting the server in production
+    
+    # Automatically create tables for the desktop app
+    from app.database import engine, Base
     Base.metadata.create_all(bind=engine)
-    print("[OK] Database tables created")
 
     # Seed default data
     db = SessionLocal()
@@ -44,21 +57,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow React dev server
+# CORS — allow React dev server and production domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(',')],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # API Caching Middleware for speed
-from app.middleware import QueryCacheMiddleware
 app.add_middleware(QueryCacheMiddleware)
 
 # Mount all routers under /api
-from app.routers import auth, users, products, categories, inventory, billing, sales, reports, settings as settings_router, backup
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
@@ -72,20 +83,14 @@ app.include_router(settings_router.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 
 
-from fastapi import Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-import logging
-
 # Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Centralized Error Handlers
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = exc.errors()
@@ -95,12 +100,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"success": False, "error": {"message": error_msg, "statusCode": 400}},
     )
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"success": False, "error": {"message": exc.detail, "statusCode": exc.status_code}},
     )
+
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -110,12 +117,12 @@ async def generic_exception_handler(request: Request, exc: Exception):
         content={"success": False, "error": {"message": "Internal Server Error", "statusCode": 500}},
     )
 
+
 @app.get("/api/health")
 def health_check():
     """Health check endpoint."""
     return {"status": "ok", "version": settings.APP_VERSION}
 
-import sys
 
 # Serve React Frontend Static Files
 if getattr(sys, 'frozen', False):
@@ -129,16 +136,16 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-    
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_react_app(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not Found")
-            
+
         file_path = frontend_dist / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
-            
+
         index_file = frontend_dist / "index.html"
         if index_file.exists():
             return FileResponse(str(index_file))

@@ -35,13 +35,12 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
         product_name = item.product.name if item.product else "Unknown"
         items_html += f"""
         <tr>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;">{idx}</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;">{product_name}</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">{item.quantity}</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">{currency}{item.unit_price:,.2f}</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">{currency}{item.discount:,.2f}</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">{item.tax_rate}%</td>
-            <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">{currency}{item.subtotal:,.2f}</td>
+            <td colspan="3" class="item-name">{product_name}</td>
+        </tr>
+        <tr>
+            <td class="item-details">{item.quantity} x {currency}{item.unit_price:,.2f}</td>
+            <td class="item-details" style="text-align:center;">{f"-{currency}{item.discount:,.2f}" if item.discount else ""}</td>
+            <td class="item-total">{currency}{item.subtotal:,.2f}</td>
         </tr>
         """
 
@@ -53,77 +52,71 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Invoice {sale.invoice_no}</title>
+        <title>Receipt {sale.invoice_no}</title>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
-            * {{ margin:0; padding:0; box-sizing:border-box; }}
-            body {{ font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; max-width:800px; margin:0 auto; padding:20px; }}
-            .header {{ text-align:center; margin-bottom:24px; border-bottom:2px solid #0f172a; padding-bottom:16px; }}
-            .store-name {{ font-size:24px; font-weight:700; color:#0f172a; }}
-            .store-info {{ font-size:12px; color:#64748b; margin-top:4px; }}
-            .invoice-meta {{ display:flex; justify-content:space-between; margin-bottom:20px; font-size:13px; }}
-            .invoice-meta div {{ flex:1; }}
-            .invoice-no {{ font-size:16px; font-weight:700; color:#0f172a; }}
-            table {{ width:100%; border-collapse:collapse; margin-bottom:20px; font-size:13px; }}
-            th {{ background:#0f172a; color:white; padding:10px 8px; text-align:left; font-weight:600; }}
-            th:nth-child(3),th:nth-child(4),th:nth-child(5),th:nth-child(6),th:nth-child(7) {{ text-align:right; }}
-            .totals {{ width:300px; margin-left:auto; font-size:14px; }}
-            .totals tr td {{ padding:6px 8px; }}
-            .totals .grand-total {{ font-size:18px; font-weight:700; border-top:2px solid #0f172a; color:#0f172a; }}
-            .footer {{ text-align:center; margin-top:30px; padding-top:16px; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8; }}
-            .payment-badge {{ display:inline-block; background:#059669; color:white; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:600; text-transform:uppercase; }}
+            * {{ margin:0; padding:0; box-sizing:border-box; font-family:'Courier New', Courier, monospace; }}
+            body {{ color:#000; max-width:320px; margin:0 auto; padding:15px; font-size:12px; background:#fff; }}
+            .header {{ text-align:center; margin-bottom:15px; padding-bottom:10px; border-bottom:1px dashed #000; }}
+            .store-name {{ font-size:18px; font-weight:700; text-transform:uppercase; }}
+            .store-info {{ font-size:11px; margin-top:4px; }}
+            .invoice-meta {{ margin-bottom:15px; font-size:11px; padding-bottom:10px; border-bottom:1px dashed #000; }}
+            .invoice-meta div {{ margin-bottom:4px; }}
+            table {{ width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px; }}
+            th {{ border-bottom:1px dashed #000; padding:4px 0; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; }}
+            td {{ padding:2px 0; }}
+            .item-name {{ font-weight:700; padding-top:6px; }}
+            .item-details {{ font-size:11px; color:#333; }}
+            .item-total {{ text-align:right; font-weight:700; }}
+            .totals {{ width:100%; font-size:12px; border-top:1px dashed #000; padding-top:10px; }}
+            .totals tr td {{ padding:4px 0; }}
+            .totals .grand-total {{ font-size:16px; font-weight:700; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:8px 0; }}
+            .footer {{ text-align:center; margin-top:15px; padding-top:10px; font-size:11px; }}
+            .barcode-container {{ text-align:center; margin-top:20px; display:flex; justify-content:center; }}
+            .barcode-container svg {{ shape-rendering: crispEdges; }}
             @media print {{
-                body {{ padding:10px; }}
+                @page {{ margin: 0; size: 80mm auto; }}
+                body {{ padding: 0; max-width: 100%; width: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
                 .no-print {{ display:none; }}
             }}
         </style>
     </head>
     <body>
-        <div class="no-print" style="margin-bottom:20px; text-align:right;">
-            <button onclick="window.print()" style="background:#0f172a; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">🖨️ Print Invoice</button>
+        <div class="no-print" style="margin-bottom:20px; text-align:center;">
+            <button onclick="window.print()" style="background:#0f172a; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:600; font-family:sans-serif;">🖨️ Print Receipt</button>
         </div>
+        
         <div class="header">
             <div class="store-name">{store['store_name']}</div>
             <div class="store-info">
                 {store['store_address']}<br>
-                {f"Phone: {store['store_phone']}" if store['store_phone'] else ""}
-                {f" | Email: {store['store_email']}" if store['store_email'] else ""}
-                {f"<br>GSTIN: {store['store_gst']}" if store['store_gst'] else ""}
+                {f"Ph: {store['store_phone']}" if store['store_phone'] else ""}
+                {f" | {store['store_email']}" if store['store_email'] else ""}
+                {f"<br>GST: {store['store_gst']}" if store['store_gst'] else ""}
             </div>
         </div>
 
         <div class="invoice-meta">
-            <div>
-                <div class="invoice-no">Invoice: {sale.invoice_no}</div>
-                <div>Date: {created}</div>
-            </div>
-            <div style="text-align:right;">
-                <div>Cashier: {cashier}</div>
-                <div>Payment: <span class="payment-badge">{sale.payment_method}</span></div>
-            </div>
+            <div><strong>Bill No:</strong> {sale.invoice_no}</div>
+            <div><strong>Date:</strong> {created}</div>
+            <div><strong>Cashier:</strong> {cashier}</div>
+            <div><strong>Payment:</strong> {sale.payment_method.upper()}</div>
         </div>
 
         {"" if not any([sale.customer_name, sale.customer_phone, sale.customer_place, sale.customer_email]) else f'''
-        <div style="margin-bottom:20px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
-            <div style="font-weight:700;color:#0f172a;margin-bottom:6px;font-size:14px;">Customer Details</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px 24px;">
-                {f'<div><span style="color:#64748b;">Name:</span> {sale.customer_name}</div>' if sale.customer_name else ''}
-                {f'<div><span style="color:#64748b;">Phone:</span> {sale.customer_phone}</div>' if sale.customer_phone else ''}
-                {f'<div><span style="color:#64748b;">Place:</span> {sale.customer_place}</div>' if sale.customer_place else ''}
-                {f'<div><span style="color:#64748b;">Email:</span> {sale.customer_email}</div>' if sale.customer_email else ''}
-            </div>
+        <div style="margin-bottom:15px;font-size:11px; border-bottom:1px dashed #000; padding-bottom:10px;">
+            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Customer</div>
+            {f'<div>{sale.customer_name}</div>' if sale.customer_name else ''}
+            {f'<div>{sale.customer_phone}</div>' if sale.customer_phone else ''}
         </div>
         '''}
 
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Product</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Disc.</th>
-                    <th>Tax</th>
-                    <th>Total</th>
+                    <th>Item</th>
+                    <th style="text-align:center;">Disc</th>
+                    <th style="text-align:right;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -135,18 +128,34 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
             <tr><td>Subtotal</td><td style="text-align:right;">{currency}{sale.subtotal:,.2f}</td></tr>
             <tr><td>Discount</td><td style="text-align:right;">-{currency}{sale.discount:,.2f}</td></tr>
             <tr><td>Tax</td><td style="text-align:right;">+{currency}{sale.tax:,.2f}</td></tr>
-            <tr class="grand-total"><td>Grand Total</td><td style="text-align:right;">{currency}{sale.total:,.2f}</td></tr>
+            <tr class="grand-total"><td>Total</td><td style="text-align:right;">{currency}{sale.total:,.2f}</td></tr>
         </table>
 
+        <div class="barcode-container">
+            <svg id="barcode"></svg>
+        </div>
+
         <div class="footer">
-            Thank you for shopping with us!<br>
+            <strong>Thank you for shopping!</strong><br>
             {f"GSTIN: {store['store_gst']}" if store['store_gst'] else ""}
         </div>
+
         <script>
             window.onload = function() {{
+                if (typeof JsBarcode !== 'undefined') {{
+                    JsBarcode("#barcode", "{sale.invoice_no}", {{
+                        format: "CODE128",
+                        width: 1.5,
+                        height: 40,
+                        fontSize: 12,
+                        margin: 0,
+                        displayValue: true,
+                        fontOptions: "bold"
+                    }});
+                }}
                 setTimeout(function() {{
                     window.print();
-                }}, 500);
+                }}, 800);
             }};
         </script>
     </body>

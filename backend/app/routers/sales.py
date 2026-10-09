@@ -65,13 +65,13 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
     customers = (
         db.query(Sale.customer_phone, Sale.customer_name, Sale.customer_place, Sale.customer_email)
         .filter(Sale.customer_phone.ilike(f"%{q}%") | Sale.customer_name.ilike(f"%{q}%"))
-        .filter(Sale.customer_phone != None)
+        .filter(Sale.customer_phone.is_not(None))
         .filter(Sale.customer_phone != "")
         .distinct()
         .limit(10)
         .all()
     )
-    
+
     return [
         {
             "phone": c.customer_phone,
@@ -81,6 +81,7 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
         }
         for c in customers
     ]
+
 
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):

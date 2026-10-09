@@ -33,7 +33,13 @@ if __name__ == '__main__':
     server_url = "http://127.0.0.1:8000"
     
     # Wait robustly for the server to start before opening the window
-    wait_for_server(server_url)
+    if not wait_for_server(server_url):
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Server Error", "The backend server failed to start. Port 8000 might be in use or there was a missing dependency.")
+        sys.exit(1)
 
     # Open the Desktop Window pointing to the local server
     webview.create_window(
@@ -47,3 +53,7 @@ if __name__ == '__main__':
     
     # Start the webview GUI event loop
     webview.start()
+    
+    # Force exit to ensure the uvicorn daemon thread and any async threadpools are killed immediately
+    import os
+    os._exit(0)

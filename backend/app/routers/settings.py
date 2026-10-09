@@ -8,7 +8,7 @@ from typing import Dict
 from app.database import get_db
 from app.auth import require_role, get_current_user
 from app.models.setting import Setting
-from app.schemas.setting import SettingResponse, BulkSettingsUpdate, StoreProfile
+from app.schemas.setting import BulkSettingsUpdate, StoreProfile
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 

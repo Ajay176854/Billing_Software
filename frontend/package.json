@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/file-saver": "^2.0.7",
     "@types/jsbarcode": "^3.11.4",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",

@@ -79,7 +79,8 @@ def stock_transactions(
         query = query.filter(StockTransaction.type == type)
 
     from sqlalchemy.orm import joinedload
-    txns = query.options(joinedload(StockTransaction.product), joinedload(StockTransaction.user)).order_by(StockTransaction.created_at.desc()).limit(limit).all()
+    txns = query.options(joinedload(StockTransaction.product), joinedload(StockTransaction.user)
+                         ).order_by(StockTransaction.created_at.desc()).limit(limit).all()
 
     return [
         StockTransactionResponse(
