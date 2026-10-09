@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database - Default to local SQLite, override in .env for production
-    DATABASE_URL: str = "sqlite:///./billing.db"
+    # On Vercel, the filesystem is read-only except for /tmp.
+    DATABASE_URL: str = "sqlite:////tmp/billing.db"
 
     # JWT Authentication - Override in .env for production
     SECRET_KEY: str = "729a4a7538a7c2980c58e657a79a6136d4df6a929fb0740632b6946e3ed9fb71"
