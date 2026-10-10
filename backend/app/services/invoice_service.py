@@ -1,7 +1,7 @@
 """
 Invoice Service — generate printable HTML invoice/receipt.
 """
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.setting import Setting
@@ -24,7 +24,6 @@ def get_store_settings(db: Session) -> dict:
 
 def generate_invoice_html(db: Session, sale_id: int) -> str:
     """Generate a printable HTML invoice for a sale."""
-    from sqlalchemy.orm import joinedload
     sale = db.query(Sale).options(joinedload(Sale.items).joinedload(SaleItem.product)).filter(Sale.id == sale_id).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")

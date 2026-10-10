@@ -2,7 +2,7 @@
 Sales router — sales history, details, and cancellation.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 
@@ -41,7 +41,6 @@ def list_sales(
     if status_filter:
         query = query.filter(Sale.status == status_filter)
 
-    from sqlalchemy.orm import joinedload
     sales = query.options(joinedload(Sale.user), joinedload(Sale.items)).order_by(Sale.created_at.desc()).limit(limit).all()
 
     return [
@@ -87,7 +86,6 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """Get detailed sale information with line items."""
-    from sqlalchemy.orm import joinedload
     sale = db.query(Sale).options(
         joinedload(Sale.user),
         joinedload(Sale.items).joinedload(SaleItem.product)

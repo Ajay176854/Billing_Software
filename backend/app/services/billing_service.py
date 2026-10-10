@@ -12,7 +12,7 @@ inside a single database transaction:
 6. Commit atomically; rollback on any failure.
 """
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from fastapi import HTTPException, status
 
@@ -142,7 +142,7 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
         # Step 6: Commit atomically
         db.commit()
         
-        from sqlalchemy.orm import joinedload
+        
         sale_with_rels = db.query(Sale).options(
             joinedload(Sale.user),
             joinedload(Sale.items).joinedload(SaleItem.product)
@@ -166,7 +166,6 @@ def cancel_sale(db: Session, sale_id: int, user_id: int) -> Sale:
     Cancel a completed sale and restore stock (BR-04).
     """
     try:
-        from sqlalchemy.orm import joinedload
         sale = db.query(Sale).options(
             joinedload(Sale.user),
             joinedload(Sale.items).joinedload(SaleItem.product)
