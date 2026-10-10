@@ -196,7 +196,7 @@ export default function Products() {
               <th className="px-4 py-3 text-left font-medium">Product</th>
               <th className="px-4 py-3 text-left font-medium">Barcode/SKU</th>
               <th className="px-4 py-3 text-left font-medium">Category</th>
-              <th className="px-4 py-3 text-right font-medium">Buy Price</th>
+              {canManage && <th className="px-4 py-3 text-right font-medium">Buy Price</th>}
               <th className="px-4 py-3 text-right font-medium">Sell Price</th>
               <th className="px-4 py-3 text-right font-medium">Tax</th>
               <th className="px-4 py-3 text-center font-medium">Stock</th>
@@ -210,7 +210,7 @@ export default function Products() {
                 <td className="px-4 py-3 font-medium text-text-primary">{p.name}</td>
                 <td className="px-4 py-3 text-text-muted font-mono text-xs">{p.barcode || p.sku || '-'}</td>
                 <td className="px-4 py-3 text-text-muted">{p.category_name || '-'}</td>
-                <td className="px-4 py-3 text-right text-text-muted">{fmt(p.purchase_price)}</td>
+                {canManage && <td className="px-4 py-3 text-right text-text-muted">{fmt(p.purchase_price)}</td>}
                 <td className="px-4 py-3 text-right font-semibold text-text-primary">{fmt(p.selling_price)}</td>
                 <td className="px-4 py-3 text-right text-text-muted">{p.tax_rate}%</td>
                 <td className="px-4 py-3 text-center font-semibold text-text-primary">{p.stock_qty}</td>
