@@ -8,7 +8,28 @@ import os
 import urllib.request
 from urllib.error import URLError
 
+import base64
+import tkinter as tk
+from tkinter import filedialog
 from app.main import app
+
+class DesktopApi:
+    def save_excel(self, base64_data, filename):
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            initialfile=filename,
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            title="Save Report"
+        )
+        if filepath:
+            with open(filepath, "wb") as f:
+                f.write(base64.b64decode(base64_data))
+            return True
+        return False
+
 
 def run_server():
     """Run the FastAPI backend on localhost:8000"""
@@ -41,10 +62,12 @@ if __name__ == '__main__':
         messagebox.showerror("Server Error", "The backend server failed to start. Port 8000 might be in use or there was a missing dependency.")
         sys.exit(1)
 
+    api = DesktopApi()
     # Open the Desktop Window pointing to the local server
     webview.create_window(
         title="Billing Software",
         url=server_url,
+        js_api=api,
         width=1280,
         height=800,
         min_size=(1024, 600),

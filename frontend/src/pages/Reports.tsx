@@ -312,9 +312,28 @@ export default function Reports() {
     }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, `Business_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      import('react-hot-toast').then(({ default: toast }) => toast.success('Export successful!'));
+      const filename = `Business_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // @ts-ignore
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.save_excel) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        // Process in chunks to avoid max call stack size exceeded on large files
+        for (let i = 0; i < bytes.byteLength; i += 1024) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 1024)));
+        }
+        const base64 = btoa(binary);
+        
+        // @ts-ignore
+        const saved = await window.pywebview.api.save_excel(base64, filename);
+        if (saved) {
+          import('react-hot-toast').then(({ default: toast }) => toast.success('Export saved successfully!'));
+        }
+      } else {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, filename);
+        import('react-hot-toast').then(({ default: toast }) => toast.success('Export successful!'));
+      }
     } catch (err: any) {
       console.error(err);
       import('react-hot-toast').then(({ default: toast }) => toast.error('Export failed: ' + (err.message || 'Unknown error')));
