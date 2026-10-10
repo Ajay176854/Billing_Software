@@ -50,7 +50,7 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
             product = db.query(Product).filter(
                 Product.id == item.product_id,
                 Product.status == "active"
-            ).with_for_update().first()
+            ).with_for_update(of=Product).first()
 
             if not product:
                 raise HTTPException(
@@ -141,8 +141,14 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
 
         # Step 6: Commit atomically
         db.commit()
-        db.refresh(sale)
-        return sale
+        
+        from sqlalchemy.orm import joinedload
+        sale_with_rels = db.query(Sale).options(
+            joinedload(Sale.user),
+            joinedload(Sale.items).joinedload(SaleItem.product)
+        ).filter(Sale.id == sale.id).first()
+        
+        return sale_with_rels
 
     except HTTPException:
         db.rollback()
