@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
-import { UserPlus, X, Shield, ShieldCheck, Warehouse as WarehouseIcon, Trash2 } from 'lucide-react';
+import { UserPlus, X, Shield, ShieldCheck, Warehouse as WarehouseIcon, Trash2, Pencil } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import { ConfirmModal } from '../components/ConfirmModal';
 
@@ -9,6 +9,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'staff' });
+  const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,9 +21,18 @@ export default function UsersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/users', form);
-      toast.success('User created');
+      if (editingUser) {
+        await api.put(`/users/${editingUser.id}`, { name: form.name, email: form.email, role: form.role });
+        if (form.password) {
+            await api.post(`/users/${editingUser.id}/reset-password`, { new_password: form.password });
+        }
+        toast.success('User updated');
+      } else {
+        await api.post('/users', form);
+        toast.success('User created');
+      }
       setShowModal(false);
+      setEditingUser(null);
       setForm({ name: '', username: '', email: '', password: '', role: 'staff' });
       fetchUsers();
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed'); }
@@ -62,7 +72,7 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-text-primary">Users & Roles</h1>
           <p className="text-sm text-text-muted">{users.length} users</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25"><UserPlus className="h-4 w-4" /> Add User</button>
+        <button onClick={() => { setEditingUser(null); setForm({ name: '', username: '', email: '', password: '', role: 'staff' }); setShowModal(true); }} className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25"><UserPlus className="h-4 w-4" /> Add User</button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-bg-card">
@@ -88,14 +98,21 @@ export default function UsersPage() {
                   <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${u.status === 'active' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>{u.status}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
-                      {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button onClick={() => setUserToDelete(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {u.username === 'moira_admin' ? (
+                    <span className="text-xs text-text-muted italic">System Admin</span>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => { setEditingUser(u); setForm({ name: u.name, username: u.username, email: u.email || '', password: '', role: u.role }); setShowModal(true); }} className="rounded-lg p-1 text-accent hover:bg-accent/10 transition-colors" title="Edit User">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
+                        {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => setUserToDelete(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -113,17 +130,17 @@ export default function UsersPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <form onSubmit={handleSubmit} className="animate-scale-in w-full max-w-md rounded-2xl border border-border bg-bg-card p-6 shadow-modal">
-            <div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-bold text-text-primary">Add User</h3><button type="button" onClick={() => setShowModal(false)} className="rounded-lg p-1 text-text-muted hover:text-text-primary"><X className="h-5 w-5" /></button></div>
+            <div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-bold text-text-primary">{editingUser ? 'Edit User' : 'Add User'}</h3><button type="button" onClick={() => { setShowModal(false); setEditingUser(null); }} className="rounded-lg p-1 text-text-muted hover:text-text-primary"><X className="h-5 w-5" /></button></div>
             <div className="space-y-4">
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Full Name *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
-              <div><label className="mb-1 block text-xs font-medium text-text-secondary">Username *</label><input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
+              <div><label className="mb-1 block text-xs font-medium text-text-secondary">Username *</label><input required disabled={!!editingUser} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary disabled:opacity-50" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
-              <div><label className="mb-1 block text-xs font-medium text-text-secondary">Password *</label><input required type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
+              <div><label className="mb-1 block text-xs font-medium text-text-secondary">{editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}</label><input required={!editingUser} type="password" minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Role</label><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary"><option value="staff">Billing Staff</option><option value="inventory">Inventory Staff</option><option value="admin">Administrator</option></select></div>
             </div>
             <div className="mt-6 flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted">Cancel</button>
-              <button type="submit" className="bg-gradient-to-br from-indigo-600 to-indigo-500 rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25">Create User</button>
+              <button type="button" onClick={() => { setShowModal(false); setEditingUser(null); }} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted">Cancel</button>
+              <button type="submit" className="bg-gradient-to-br from-indigo-600 to-indigo-500 rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25">{editingUser ? 'Save Changes' : 'Create User'}</button>
             </div>
           </form>
         </div>
