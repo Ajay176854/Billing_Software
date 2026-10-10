@@ -1,18 +1,19 @@
-import time
+import json
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-
+import redis.asyncio as redis
+from app.config import settings
 
 class QueryCacheMiddleware(BaseHTTPMiddleware):
     """
-    Middleware to cache API GET responses in memory to increase DB fetch speed.
+    Middleware to cache API GET responses in Redis to increase DB fetch speed.
     Automatically invalidates cache when POST, PUT, or DELETE requests are made.
     """
 
     def __init__(self, app):
         super().__init__(app)
-        self.cache = {}
+        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=False)
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -25,9 +26,11 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
 
         # If it's a mutation, clear the cache for that resource group
         if method in ["POST", "PUT", "DELETE", "PATCH"]:
-            # Simple invalidation: clear everything to ensure data consistency
-            # since a sale affects inventory, reports, etc.
-            self.cache.clear()
+            try:
+                await self.redis.flushdb()
+            except Exception as e:
+                # Fallback if Redis is down, we just proceed
+                print(f"Redis cache clear error: {e}")
             return await call_next(request)
 
         # Only cache GET requests
@@ -40,15 +43,18 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
 
         # Construct cache key from URL and query params
         query_string = request.url.query
-        cache_key = f"{path}?{query_string}" if query_string else path
+        cache_key = f"cache:{path}?{query_string}" if query_string else f"cache:{path}"
 
-        # Check cache (15 second TTL for fast realtime feeling, but prevents DB overload)
-        if cache_key in self.cache:
-            data, expiry, headers, status_code = self.cache[cache_key]
-            if time.time() < expiry:
-                return Response(content=data, status_code=status_code, headers=headers)
-            else:
-                del self.cache[cache_key]
+        try:
+            # Check Redis cache
+            cached_data = await self.redis.get(cache_key)
+            if cached_data:
+                cached_headers_json = await self.redis.get(f"{cache_key}:headers")
+                headers = json.loads(cached_headers_json) if cached_headers_json else {}
+                return Response(content=cached_data, status_code=200, headers=headers)
+        except Exception as e:
+            print(f"Redis read error: {e}")
+            # If Redis is down, continue without cache
 
         # Process the request
         response = await call_next(request)
@@ -65,8 +71,12 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
             # Remove content-length as it might change or cause issues if compressed
             headers.pop("content-length", None)
 
-            # Store in cache with 15-second TTL
-            self.cache[cache_key] = (body, time.time() + 15, headers, response.status_code)
+            try:
+                # Store in Redis with 15-second TTL
+                await self.redis.setex(cache_key, 15, body)
+                await self.redis.setex(f"{cache_key}:headers", 15, json.dumps(headers).encode('utf-8'))
+            except Exception as e:
+                print(f"Redis write error: {e}")
 
             return Response(content=body, status_code=response.status_code, headers=headers)
 

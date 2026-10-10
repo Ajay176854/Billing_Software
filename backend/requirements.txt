@@ -11,3 +11,4 @@ aiofiles
 psycopg2-binary
 slowapi
 pg8000
+redis

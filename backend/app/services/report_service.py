@@ -3,7 +3,7 @@ Report Service — business intelligence queries.
 """
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
@@ -27,24 +27,18 @@ def get_dashboard_stats(db: Session) -> dict:
     today_sales = float(today_result[0])
     today_bills = int(today_result[1])
 
-    # Product counts
-    total_products = db.query(func.count(Product.id)).filter(Product.status == "active").scalar() or 0
+    # Product counts and inventory value
+    product_stats = db.query(
+        func.count(Product.id).label('total'),
+        func.sum(case(((Product.stock_qty == 0), 1), else_=0)).label('out_of_stock'),
+        func.sum(case(((Product.stock_qty > 0) & (Product.stock_qty <= Product.reorder_level), 1), else_=0)).label('low_stock'),
+        func.coalesce(func.sum(Product.stock_qty * Product.purchase_price), 0).label('inventory_value')
+    ).filter(Product.status == "active").first()
 
-    low_stock_count = db.query(func.count(Product.id)).filter(
-        Product.status == "active",
-        Product.stock_qty > 0,
-        Product.stock_qty <= Product.reorder_level
-    ).scalar() or 0
-
-    out_of_stock_count = db.query(func.count(Product.id)).filter(
-        Product.status == "active",
-        Product.stock_qty == 0
-    ).scalar() or 0
-
-    # Total inventory value (at purchase price)
-    inventory_value = db.query(
-        func.coalesce(func.sum(Product.stock_qty * Product.purchase_price), 0)
-    ).filter(Product.status == "active").scalar() or 0
+    total_products = product_stats.total or 0
+    out_of_stock_count = product_stats.out_of_stock or 0
+    low_stock_count = product_stats.low_stock or 0
+    inventory_value = product_stats.inventory_value or 0
 
     # Recent 5 sales
     recent_sales = db.query(Sale).filter(
@@ -135,48 +129,55 @@ def get_dashboard_stats(db: Session) -> dict:
 
 def get_sales_by_date_range(db: Session, start_date: datetime, end_date: datetime) -> list:
     """Get daily sales summary for a date range."""
-    # Fetch all relevant sales with items and products for cost calculation
-    from sqlalchemy.orm import joinedload
-    sales = db.query(Sale).options(
-        joinedload(Sale.items).joinedload(SaleItem.product)
+    # Fetch only required columns
+    query_results = db.query(
+        Sale.id, Sale.created_at, Sale.total, Sale.discount, Sale.tax,
+        SaleItem.quantity, Product.purchase_price
+    ).outerjoin(
+        SaleItem, Sale.id == SaleItem.sale_id
+    ).outerjoin(
+        Product, SaleItem.product_id == Product.id
     ).filter(
         Sale.created_at >= start_date,
         Sale.created_at <= end_date,
         Sale.status == "completed",
-    ).order_by(Sale.created_at).all()
+    ).all()
 
     daily_stats = {}
     
-    for s in sales:
+    for row in query_results:
+        sale_id, created_at, total, discount, tax, quantity, purchase_price = row
+        
         # Offset by IST (+5:30) 
-        local_date = (s.created_at + timedelta(hours=5, minutes=30)).date()
+        local_date = (created_at + timedelta(hours=5, minutes=30)).date()
         date_str = str(local_date)
         
         if date_str not in daily_stats:
             daily_stats[date_str] = {
                 "total_sales": 0.0,
-                "total_bills": 0,
+                "total_bills": set(),
                 "total_discount": 0.0,
                 "total_tax": 0.0,
                 "total_cost": 0.0
             }
             
         stats = daily_stats[date_str]
-        stats["total_sales"] += float(s.total)
-        stats["total_bills"] += 1
-        stats["total_discount"] += float(s.discount)
-        stats["total_tax"] += float(s.tax)
         
-        for item in s.items:
-            if item.product:
-                stats["total_cost"] += float(item.quantity) * float(item.product.purchase_price)
+        if sale_id not in stats["total_bills"]:
+            stats["total_bills"].add(sale_id)
+            stats["total_sales"] += float(total)
+            stats["total_discount"] += float(discount)
+            stats["total_tax"] += float(tax)
+        
+        if quantity and purchase_price is not None:
+            stats["total_cost"] += float(quantity) * float(purchase_price)
 
     result = []
     for date_str, stats in daily_stats.items():
         result.append({
             "date": date_str,
             "total_sales": stats["total_sales"],
-            "total_bills": stats["total_bills"],
+            "total_bills": len(stats["total_bills"]),
             "total_discount": stats["total_discount"],
             "total_tax": stats["total_tax"],
             "total_profit": stats["total_sales"] - stats["total_tax"] - stats["total_cost"],
@@ -263,7 +264,12 @@ def get_itemized_sales_report(db: Session, start_date: datetime = None, end_date
 
 def get_customer_traffic_report(db: Session, start_date: datetime = None, end_date: datetime = None) -> list:
     """Get customer traffic report: top customers by purchase frequency and volume."""
-    query = db.query(Sale).filter(
+    query = db.query(
+        Sale.customer_phone,
+        Sale.customer_name,
+        Sale.total,
+        Sale.created_at
+    ).filter(
         Sale.status == "completed",
         Sale.customer_phone.is_not(None),
         Sale.customer_phone != ""
@@ -277,8 +283,7 @@ def get_customer_traffic_report(db: Session, start_date: datetime = None, end_da
     sales = query.all()
     
     customers = {}
-    for s in sales:
-        phone = s.customer_phone
+    for phone, name, total, created_at in sales:
         if phone not in customers:
             customers[phone] = {
                 "names": set(),
@@ -288,13 +293,13 @@ def get_customer_traffic_report(db: Session, start_date: datetime = None, end_da
             }
         
         c = customers[phone]
-        if s.customer_name:
-            c["names"].add(s.customer_name)
+        if name:
+            c["names"].add(name)
         c["total_visits"] += 1
-        c["total_spent"] += float(s.total)
+        c["total_spent"] += float(total)
         
-        if not c["last_visit"] or (s.created_at and s.created_at > c["last_visit"]):
-            c["last_visit"] = s.created_at
+        if not c["last_visit"] or (created_at and created_at > c["last_visit"]):
+            c["last_visit"] = created_at
             
     results = []
     for phone, data in customers.items():
@@ -320,9 +325,15 @@ def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "o
     period: 'daily' or 'monthly'
     group_by: 'overall' or 'product'
     """
-    from sqlalchemy.orm import joinedload
-    sales_query = db.query(Sale).options(
-        joinedload(Sale.items).joinedload(SaleItem.product)
+    # Fetch only needed columns
+    sales_query = db.query(
+        Sale.id, Sale.created_at, Sale.total, Sale.tax,
+        SaleItem.product_id, SaleItem.quantity, SaleItem.unit_price, SaleItem.discount,
+        Product.name, Product.purchase_price
+    ).outerjoin(
+        SaleItem, Sale.id == SaleItem.sale_id
+    ).outerjoin(
+        Product, SaleItem.product_id == Product.id
     ).filter(Sale.status == "completed")
     
     if start_date:
@@ -334,8 +345,12 @@ def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "o
     
     results_map = {}
     
-    for s in sales:
-        local_time = s.created_at + timedelta(hours=5, minutes=30)
+    # We need to deduplicate sale totals and taxes because of the join
+    processed_sales = set()
+    
+    for row in sales:
+        sale_id, created_at, total, tax, product_id, quantity, unit_price, discount, product_name, purchase_price = row
+        local_time = created_at + timedelta(hours=5, minutes=30)
         
         if period == "monthly":
             period_str = local_time.strftime('%Y-%m')
@@ -351,35 +366,36 @@ def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "o
                     "total_cost": 0.0
                 }
             r = results_map[period_str]
-            r["total_sales"] += float(s.total)
-            r["total_bills"] += 1
-            r["total_tax"] += float(s.tax)
             
-            for item in s.items:
-                if item.product:
-                    r["total_cost"] += float(item.quantity) * float(item.product.purchase_price)
+            if sale_id not in processed_sales:
+                processed_sales.add(sale_id)
+                r["total_sales"] += float(total)
+                r["total_bills"] += 1
+                r["total_tax"] += float(tax)
+            
+            if quantity and purchase_price is not None:
+                r["total_cost"] += float(quantity) * float(purchase_price)
                     
         else: # group_by == "product"
-            for item in s.items:
-                if not item.product:
-                    continue
-                    
-                key = f"{period_str}_{item.product_id}"
-                if key not in results_map:
-                    results_map[key] = {
-                        "date": period_str,
-                        "product_id": item.product_id,
-                        "product_name": item.product.name,
-                        "qty_sold": 0,
-                        "revenue": 0.0,
-                        "profit": 0.0
-                    }
-                r = results_map[key]
-                r["qty_sold"] += item.quantity
-                revenue = float(item.unit_price * item.quantity) - float(item.discount)
-                r["revenue"] += revenue
-                cost = float(item.product.purchase_price * item.quantity)
-                r["profit"] += (revenue - cost)
+            if not product_id:
+                continue
+                
+            key = f"{period_str}_{product_id}"
+            if key not in results_map:
+                results_map[key] = {
+                    "date": period_str,
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "qty_sold": 0,
+                    "revenue": 0.0,
+                    "profit": 0.0
+                }
+            r = results_map[key]
+            r["qty_sold"] += quantity
+            revenue = float(unit_price * quantity) - float(discount)
+            r["revenue"] += revenue
+            cost = float(purchase_price * quantity)
+            r["profit"] += (revenue - cost)
                 
     if group_by == "overall":
         output = []
