@@ -109,7 +109,8 @@ export default function Reports() {
   }, [startDate, endDate, monitoringPeriod, monitoringGroup]);
 
   const exportToExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
+    try {
+      const workbook = new ExcelJS.Workbook();
 
     // --- Sheet 1: Detailed Itemized Sales ---
     const wsItemized = workbook.addWorksheet('Detailed Sales');
@@ -310,9 +311,14 @@ export default function Reports() {
       wsMonitoring.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `Business_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Business_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      import('react-hot-toast').then(({ default: toast }) => toast.success('Export successful!'));
+    } catch (err: any) {
+      console.error(err);
+      import('react-hot-toast').then(({ default: toast }) => toast.error('Export failed: ' + (err.message || 'Unknown error')));
+    }
   };
 
   return (
@@ -337,7 +343,7 @@ export default function Reports() {
           </div>
           <button
             onClick={exportToExcel}
-            disabled={loading || (tab === 'sales' ? salesData.length === 0 : productData.length === 0)}
+            disabled={loading}
             className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" /> Export
