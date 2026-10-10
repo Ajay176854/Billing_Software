@@ -3,11 +3,13 @@ import api from '../api/client';
 import toast from 'react-hot-toast';
 import { UserPlus, X, Shield, ShieldCheck, Warehouse as WarehouseIcon, Trash2 } from 'lucide-react';
 import Pagination from '../components/Pagination';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'staff' });
+  const [userToDelete, setUserToDelete] = useState<any>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
@@ -34,13 +36,14 @@ export default function UsersPage() {
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed'); }
   };
 
-  const deleteUser = async (user: any) => {
-    if (!window.confirm(`Are you sure you want to delete user ${user.name}? This action cannot be undone.`)) return;
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
     try {
-      await api.delete(`/users/${user.id}`);
-      toast.success(`User ${user.name} deleted`);
+      await api.delete(`/users/${userToDelete.id}`);
+      toast.success(`User ${userToDelete.name} deleted`);
       fetchUsers();
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed to delete user'); }
+    setUserToDelete(null);
   };
 
   const roleIcon = (role: string) => {
@@ -89,7 +92,7 @@ export default function UsersPage() {
                     <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
                       {u.status === 'active' ? 'Deactivate' : 'Activate'}
                     </button>
-                    <button onClick={() => deleteUser(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
+                    <button onClick={() => setUserToDelete(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -125,6 +128,14 @@ export default function UsersPage() {
           </form>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!userToDelete}
+        title="Delete User"
+        message={`Are you sure you want to delete user ${userToDelete?.name}? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setUserToDelete(null)}
+      />
     </div>
   );
 }
