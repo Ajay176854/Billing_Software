@@ -160,7 +160,11 @@ def cancel_sale(db: Session, sale_id: int, user_id: int) -> Sale:
     Cancel a completed sale and restore stock (BR-04).
     """
     try:
-        sale = db.query(Sale).filter(Sale.id == sale_id).first()
+        from sqlalchemy.orm import joinedload
+        sale = db.query(Sale).options(
+            joinedload(Sale.user),
+            joinedload(Sale.items).joinedload(SaleItem.product)
+        ).filter(Sale.id == sale_id).first()
         if not sale:
             raise HTTPException(status_code=404, detail="Sale not found")
 

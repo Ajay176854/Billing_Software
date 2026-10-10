@@ -9,6 +9,7 @@ from datetime import datetime
 from app.database import get_db
 from app.auth import get_current_user, require_role
 from app.models.sale import Sale
+from app.models.sale_item import SaleItem
 from app.schemas.sale import SaleResponse, SaleListResponse, SaleItemResponse
 from app.services.billing_service import cancel_sale
 
@@ -86,7 +87,11 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """Get detailed sale information with line items."""
-    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    from sqlalchemy.orm import joinedload
+    sale = db.query(Sale).options(
+        joinedload(Sale.user),
+        joinedload(Sale.items).joinedload(SaleItem.product)
+    ).filter(Sale.id == sale_id).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
 
