@@ -47,29 +47,29 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-text-secondary">Username</label>
+              <label className="mb-1.5 block text-xs font-semibold text-text-secondary uppercase tracking-wider">Login ID</label>
               <input
                 id="login-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary placeholder-text-muted transition-all"
-                placeholder="Enter username"
+                className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary placeholder-text-muted transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                placeholder="Enter your Login ID"
                 autoFocus
                 required
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-text-secondary">Password</label>
+              <label className="mb-1.5 block text-xs font-semibold text-text-secondary uppercase tracking-wider">Password</label>
               <div className="relative">
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 pr-10 text-sm text-text-primary placeholder-text-muted transition-all"
-                  placeholder="Enter password"
+                  className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 pr-10 text-sm text-text-primary placeholder-text-muted transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  placeholder="Enter your Password"
                   required
                 />
                 <button
@@ -92,9 +92,12 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-text-muted">
-            Default: admin / admin123
-          </p>
+          <div className="mt-6 flex items-center justify-center space-x-1.5 text-xs text-text-muted">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span>Secure connection for authorized personnel</span>
+          </div>
         </div>
       </div>
     </div>
