@@ -3,6 +3,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 import redis.asyncio as redis
+import asyncio
 from app.config import settings
 
 class QueryCacheMiddleware(BaseHTTPMiddleware):
@@ -27,7 +28,7 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
         # If it's a mutation, clear the cache for that resource group
         if method in ["POST", "PUT", "DELETE", "PATCH"]:
             try:
-                await self.redis.flushdb()
+                await asyncio.wait_for(self.redis.flushdb(), timeout=2.0)
             except Exception as e:
                 # Fallback if Redis is down, we just proceed
                 print(f"Redis cache clear error: {e}")

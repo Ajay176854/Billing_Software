@@ -50,7 +50,7 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
             product = db.query(Product).filter(
                 Product.id == item.product_id,
                 Product.status == "active"
-            ).with_for_update(of=Product).first()
+            ).with_for_update().first()
 
             if not product:
                 raise HTTPException(
