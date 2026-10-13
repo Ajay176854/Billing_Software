@@ -11,7 +11,6 @@ import {
   Users,
   Settings,
   LogOut,
-  Store,
   X,
 } from 'lucide-react';
 

@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 
 from app.models.product import Product
 from app.models.stock_transaction import StockTransaction
+from app.cache import cache
 
 
 def stock_in(db: Session, product_id: int, quantity: int, user_id: int, reason: str = "Stock purchase") -> Product:
@@ -26,6 +27,7 @@ def stock_in(db: Session, product_id: int, quantity: int, user_id: int, reason: 
     db.add(txn)
     db.commit()
     db.refresh(product)
+    cache.clear()  # Invalidate product list cache so inventory shows updated stock
     return product
 
 
@@ -58,4 +60,5 @@ def adjust_stock(db: Session, product_id: int, quantity: int, user_id: int, reas
     db.add(txn)
     db.commit()
     db.refresh(product)
+    cache.clear()  # Invalidate product list cache so inventory shows updated stock
     return product
