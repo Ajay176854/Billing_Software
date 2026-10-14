@@ -121,58 +121,58 @@ def build_tspl_receipt(
     paper_width: str = "58mm",
 ) -> bytes:
     """
-    Generate the exact proven TSPL receipt matching the photo.
-    Uses precise 48mm width, tight height calculation, GAP 0 mm so it stops feeding immediately.
+    Generate the perfected full-width TSPL receipt with comfortable top margin,
+    prominent store title, edge-to-edge formatting, and tight zero-waste height.
     """
     clean_store = (store_name or "MOIRA LUXE").replace('"', '').strip()
     clean_inv = str(invoice_no).replace('"', '').strip()
     curr = "Rs."
-    sep = "--------------------------------"
+    sep = "--------------------------------------------"
 
     # Calculate exact tight height in mm (dots / 8 at 203 DPI)
-    # Header: ~105 dots, Each item: ~25 dots, Totals: ~75 dots, Footer: ~50 dots
-    needed_dots = 105 + (len(items) * 25) + (25 if discount else 0) + 125
-    height_mm = max(50, int(needed_dots / 8.0) + 4)
+    # Top + Title: ~110 dots, Meta/Header: ~90 dots, Each item: ~30 dots, Totals: ~90 dots, Footer: ~60 dots
+    needed_dots = 200 + (len(items) * 30) + (30 if discount else 0) + 150
+    height_mm = max(55, int(needed_dots / 8.0) + 4)
 
     commands = [
-        f"SIZE 48 mm, {height_mm} mm",
+        f"SIZE 54 mm, {height_mm} mm",
         "GAP 0 mm, 0 mm",
         "DIRECTION 1",
         "CLS",
-        f'TEXT 110,20,"3",0,1,1,"{clean_store}"',
-        f'TEXT 20,55,"2",0,1,1,"{sep}"',
-        f'TEXT 20,80,"2",0,1,1,"Bill No: {clean_inv}"',
-        f'TEXT 20,105,"2",0,1,1,"{sep}"',
-        f'TEXT 20,130,"2",0,1,1,"ITEM             QTY      AMOUNT"',
-        f'TEXT 20,155,"2",0,1,1,"{sep}"',
+        f'TEXT 70,30,"3",0,2,2,"{clean_store}"',
+        f'TEXT 10,90,"2",0,1,1,"{sep}"',
+        f'TEXT 15,115,"3",0,1,1,"Bill No: {clean_inv}"',
+        f'TEXT 10,145,"2",0,1,1,"{sep}"',
+        f'TEXT 15,170,"3",0,1,1,"ITEM                  QTY     AMOUNT"',
+        f'TEXT 10,200,"2",0,1,1,"{sep}"',
     ]
 
-    y = 180
+    y = 225
     for item in items:
-        name = str(item.get("name", "Item"))[:14].replace('"', '').strip()
+        name = str(item.get("name", "Item"))[:20].replace('"', '').strip()
         qty = item.get("quantity", 1)
         price = float(item.get("price", 0))
-        line = f"{name:<14}   {qty:>3}   {price:>8.2f}"
-        commands.append(f'TEXT 20,{y},"2",0,1,1,"{line}"')
-        y += 25
+        line = f"{name:<20}  {qty:>3}   {price:>8.2f}"
+        commands.append(f'TEXT 15,{y},"3",0,1,1,"{line}"')
+        y += 30
 
-    commands.append(f'TEXT 20,{y},"2",0,1,1,"{sep}"')
+    commands.append(f'TEXT 10,{y},"2",0,1,1,"{sep}"')
     y += 25
 
     # Subtotal
-    commands.append(f'TEXT 140,{y},"2",0,1,1,"Subtotal: {curr} {subtotal:,.2f}"')
-    y += 25
+    commands.append(f'TEXT 120,{y},"3",0,1,1,"Subtotal: {curr} {subtotal:,.2f}"')
+    y += 30
 
     if discount:
-        commands.append(f'TEXT 140,{y},"2",0,1,1,"Discount: -{curr} {discount:,.2f}"')
-        y += 25
+        commands.append(f'TEXT 120,{y},"3",0,1,1,"Discount: -{curr} {discount:,.2f}"')
+        y += 30
 
     # Total
-    commands.append(f'TEXT 175,{y},"2",0,1,1,"TOTAL: {curr} {total:,.2f}"')
-    y += 45
+    commands.append(f'TEXT 140,{y},"4",0,1,1,"TOTAL: {curr} {total:,.2f}"')
+    y += 55
 
     # Footer
-    commands.append(f'TEXT 60,{y},"2",0,1,1,"Thank you for shopping!"')
+    commands.append(f'TEXT 45,{y},"3",0,1,1,"Thank you for shopping!"')
     commands.append("PRINT 1")
     commands.append("")
 
