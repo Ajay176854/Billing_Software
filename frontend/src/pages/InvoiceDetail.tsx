@@ -41,27 +41,55 @@ export default function InvoiceDetail() {
   const [printing, setPrinting] = useState(false);
 
   const printInvoice = async () => { 
-    if (printing) return;
+    if (printing || !sale) return;
     setPrinting(true);
+
+    const payload = {
+      invoice_no: sale.invoice_no,
+      items: (sale.items || []).map((i: any) => ({
+        name: i.product_name || i.product?.name || "Item",
+        quantity: i.quantity,
+        price: i.subtotal,
+      })),
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      total: sale.total,
+    };
+
     try {
-      // 1. Try direct hardware print to local USB printer spooler
-      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${id}`);
+      // 1. Try direct hardware print to local USB printer spooler (DEV 632-L58P)
+      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${id}`, payload);
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
-        // 2. Try direct print via current API
-        await api.post(`/printer/print-receipt/${id}`);
+        // 2. Try direct print via current API with payload
+        await api.post(`/printer/print-receipt/${id}`, payload);
         toast.success("Printed receipt directly to thermal printer!");
       } catch {
-        // 3. Fallback for pure cloud / remote browser: open clean printable invoice HTML popup
+        // 3. Fallback: print directly in browser without leaving the page
+        const printWindow = document.createElement('iframe');
+        printWindow.style.position = 'fixed';
+        printWindow.style.right = '0';
+        printWindow.style.bottom = '0';
+        printWindow.style.width = '0';
+        printWindow.style.height = '0';
+        printWindow.style.border = '0';
+        document.body.appendChild(printWindow);
+
         const token = localStorage.getItem('token');
         const printUrl = `/api/billing/invoice/${id}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-        const win = window.open(printUrl, '_blank', 'width=450,height=650');
-        if (win) {
-          toast.success("Opened printable receipt preview!");
-        } else {
-          toast.error("Please allow popups to print receipt");
-        }
+        printWindow.src = printUrl;
+        printWindow.onload = () => {
+          setTimeout(() => {
+            try {
+              printWindow.contentWindow?.focus();
+              printWindow.contentWindow?.print();
+            } finally {
+              setTimeout(() => document.body.removeChild(printWindow), 1000);
+            }
+          }, 300);
+        };
+        toast.success("Printing receipt...");
       }
     } finally {
       setPrinting(false);

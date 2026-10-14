@@ -42,7 +42,24 @@ class Settings(BaseSettings):
     CURRENCY_CODE: str = "INR"
 
     class Config:
-        env_file = ".env"
+        import sys, os
+        from pathlib import Path
+        # Look in sys._MEIPASS (PyInstaller bundle), executable directory, backend dir, or current dir
+        _search_dirs = [
+            getattr(sys, '_MEIPASS', None),
+            Path(sys.executable).parent if getattr(sys, 'frozen', False) else None,
+            Path(__file__).resolve().parent.parent,
+            Path.cwd(),
+        ]
+        _found_env = ".env"
+        for _d in _search_dirs:
+            if _d:
+                _candidate = Path(_d) / ".env"
+                if _candidate.exists():
+                    _found_env = str(_candidate)
+                    break
+
+        env_file = _found_env
         extra = "allow"
 
 

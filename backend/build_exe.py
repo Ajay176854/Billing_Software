@@ -32,6 +32,7 @@ def build_executable():
         "--name", "MoiraLuxe",
         "--icon", "logo.ico",
         "--add-data", f"{frontend_dist};frontend/dist",
+        "--add-data", f"{backend_dir / '.env'};.",
         "--hidden-import", "passlib.handlers.bcrypt",
         "--hidden-import", "bcrypt",
         "--hidden-import", "uvicorn.logging",

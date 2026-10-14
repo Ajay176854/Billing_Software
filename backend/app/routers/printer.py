@@ -64,37 +64,66 @@ def direct_print_label(payload: DirectLabelRequest):
         raise HTTPException(status_code=500, detail=f"Direct print failed: {str(e)}")
 
 
-@router.post("/print-receipt/{sale_id}")
-def direct_print_receipt(sale_id: int, db: Session = Depends(get_db)):
-    """Send ESC/POS receipt commands directly to 58mm printer without browser popup."""
-    sale = db.query(Sale).filter(Sale.id == sale_id).first()
-    if not sale:
-        raise HTTPException(status_code=404, detail="Sale not found")
+class DirectReceiptPayload(BaseModel):
+    invoice_no: Optional[str] = None
+    items: Optional[List[dict]] = None
+    subtotal: Optional[float] = None
+    discount: Optional[float] = 0.0
+    total: Optional[float] = None
+    store_name: Optional[str] = None
+    store_address: Optional[str] = None
+    store_phone: Optional[str] = None
+    currency_symbol: Optional[str] = "Rs."
+    paper_width: Optional[str] = "80mm"
 
+
+@router.post("/print-receipt/{sale_id}")
+def direct_print_receipt(
+    sale_id: int, 
+    payload: Optional[DirectReceiptPayload] = None, 
+    db: Session = Depends(get_db)
+):
+    """Send ESC/POS receipt commands directly to 58mm/80mm printer without browser popup."""
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
     store = get_store_settings(db)
-    items_data = []
-    for item in sale.items:
-        items_data.append({
-            "name": item.product.name if item.product else "Item",
-            "quantity": item.quantity,
-            "price": item.subtotal,
-        })
+    
+    if sale:
+        invoice_no = sale.invoice_no
+        items_data = [
+            {
+                "name": item.product.name if item.product else "Item",
+                "quantity": item.quantity,
+                "price": item.subtotal,
+            }
+            for item in sale.items
+        ]
+        subtotal = sale.subtotal
+        discount = sale.discount
+        total = sale.total
+    elif payload and payload.invoice_no:
+        invoice_no = payload.invoice_no
+        items_data = payload.items or []
+        subtotal = payload.subtotal or 0.0
+        discount = payload.discount or 0.0
+        total = payload.total or 0.0
+    else:
+        raise HTTPException(status_code=404, detail="Sale not found")
 
     try:
         raw_bytes = build_escpos_receipt(
-            invoice_no=sale.invoice_no,
+            invoice_no=invoice_no,
             items=items_data,
-            subtotal=sale.subtotal,
-            discount=sale.discount,
-            total=sale.total,
-            store_name=store.get("store_name", "MOIRA LUXE"),
-            store_address=store.get("store_address", ""),
-            store_phone=store.get("store_phone", ""),
-            currency_symbol=store.get("currency_symbol", "Rs."),
-            paper_width=store.get("receipt_width", "80mm"),
+            subtotal=subtotal,
+            discount=discount,
+            total=total,
+            store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
+            store_address=(payload and payload.store_address) or store.get("store_address", ""),
+            store_phone=(payload and payload.store_phone) or store.get("store_phone", ""),
+            currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
+            paper_width=(payload and payload.paper_width) or store.get("receipt_width", "80mm"),
         )
         send_raw_to_printer(raw_bytes)
-        return {"status": "ok", "message": f"Printed receipt for {sale.invoice_no}"}
+        return {"status": "ok", "message": f"Printed receipt for {invoice_no}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Direct receipt print failed: {str(e)}")
 

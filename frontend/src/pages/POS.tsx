@@ -225,7 +225,7 @@ export default function POS() {
       toast.success(`Sale completed! Invoice: ${res.data.invoice_no}`);
 
       // Instantly print receipt to thermal printer like barcode label printer
-      directPrintReceipt(res.data.id);
+      directPrintReceipt(res.data.id, res.data);
 
       // Focus back to barcode scanner immediately
       setTimeout(() => {
@@ -238,21 +238,52 @@ export default function POS() {
     }
   };
 
-  const directPrintReceipt = async (saleId: number) => {
+  const directPrintReceipt = async (saleId: number, saleData?: any) => {
+    const payload = saleData ? {
+      invoice_no: saleData.invoice_no,
+      items: (saleData.items || []).map((i: any) => ({
+        name: i.product_name || i.name || "Item",
+        quantity: i.quantity,
+        price: i.price || i.subtotal,
+      })),
+      subtotal: saleData.subtotal || saleData.total,
+      discount: saleData.discount || 0,
+      total: saleData.total,
+    } : undefined;
+
     try {
       // 1. Direct hardware print to local Windows spooler
-      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`);
+      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`, payload);
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
         // 2. Direct print via API
-        await api.post(`/printer/print-receipt/${saleId}`);
+        await api.post(`/printer/print-receipt/${saleId}`, payload);
         toast.success("Printed receipt directly to thermal printer!");
       } catch (err: any) {
-        console.warn("Direct spooler not active, falling back to browser receipt preview:", err);
+        // 3. Fallback: print inside the current app window using hidden iframe (stays inside software)
+        const printFrame = document.createElement('iframe');
+        printFrame.style.position = 'fixed';
+        printFrame.style.right = '0';
+        printFrame.style.bottom = '0';
+        printFrame.style.width = '0';
+        printFrame.style.height = '0';
+        printFrame.style.border = '0';
+        document.body.appendChild(printFrame);
+
         const token = localStorage.getItem('token');
         const printUrl = `/api/billing/invoice/${saleId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-        window.open(printUrl, '_blank', 'width=450,height=650');
+        printFrame.src = printUrl;
+        printFrame.onload = () => {
+          setTimeout(() => {
+            try {
+              printFrame.contentWindow?.focus();
+              printFrame.contentWindow?.print();
+            } finally {
+              setTimeout(() => document.body.removeChild(printFrame), 1000);
+            }
+          }, 300);
+        };
       }
     }
   };
@@ -601,7 +632,7 @@ export default function POS() {
             <p className="mt-1 text-xs text-text-muted capitalize">Paid via {completedSale.payment_method}</p>
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => directPrintReceipt(completedSale.id)}
+                onClick={() => directPrintReceipt(completedSale.id, completedSale)}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:text-accent"
               >
                 <Printer className="h-4 w-4" /> Reprint
