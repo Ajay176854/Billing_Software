@@ -14,6 +14,7 @@ from app.services.printer_service import (
     send_raw_to_printer,
     build_tspl_label,
     build_escpos_receipt,
+    print_receipt_gdi,
 )
 
 router = APIRouter(prefix="/printer", tags=["Printer"])
@@ -110,7 +111,7 @@ def direct_print_receipt(
         raise HTTPException(status_code=404, detail="Sale not found")
 
     try:
-        raw_bytes = build_escpos_receipt(
+        raw_bytes = build_tspl_receipt(
             invoice_no=invoice_no,
             items=items_data,
             subtotal=subtotal,
@@ -120,7 +121,7 @@ def direct_print_receipt(
             store_address=(payload and payload.store_address) or store.get("store_address", ""),
             store_phone=(payload and payload.store_phone) or store.get("store_phone", ""),
             currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
-            paper_width=(payload and payload.paper_width) or store.get("receipt_width", "80mm"),
+            paper_width=(payload and payload.paper_width) or store.get("receipt_width", "58mm"),
         )
         send_raw_to_printer(raw_bytes)
         return {"status": "ok", "message": f"Printed receipt for {invoice_no}"}
@@ -129,10 +130,10 @@ def direct_print_receipt(
 
 
 @router.api_route("/test-receipt", methods=["GET", "POST"])
-def direct_test_receipt(paper_width: Optional[str] = "80mm", db: Session = Depends(get_db)):
+def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depends(get_db)):
     """Print an instant test receipt directly to thermal printer with store details."""
     store = get_store_settings(db)
-    chosen_width = paper_width or store.get("receipt_width", "80mm")
+    chosen_width = paper_width or store.get("receipt_width", "58mm")
     
     test_items = [
         {"name": "Moira Silk Saree", "quantity": 1, "price": 1499.00},
@@ -144,7 +145,7 @@ def direct_test_receipt(paper_width: Optional[str] = "80mm", db: Session = Depen
     total = 2600.00
     
     try:
-        raw_bytes = build_escpos_receipt(
+        raw_bytes = build_tspl_receipt(
             invoice_no="TEST-0001",
             items=test_items,
             subtotal=subtotal,
