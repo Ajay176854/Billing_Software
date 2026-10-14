@@ -220,135 +220,106 @@ def print_receipt_gdi(
     store_address: str = "",
     store_phone: str = "",
     currency_symbol: str = "Rs.",
-    paper_width: str = "80mm",
+    paper_width: str = "58mm",
     printer_name: Optional[str] = None
 ) -> bool:
     """
-    Render a clean, crisp, pixel-perfect receipt using Windows GDI.
-    Eliminates raw command printing and formats headers, item columns, and grand totals cleanly.
+    Direct Windows native vector text printing.
+    Uses native Windows GDI font rendering (No images/bitmaps), eliminating blank feeding
+    and producing the crisp receipt layout shown in your photo.
     """
-    try:
-        import win32ui
-        import win32con
-        from PIL import Image, ImageDraw, ImageFont, ImageWin
-    except ImportError:
-        # Fallback to raw if GDI components unavailable
-        raw = build_tspl_receipt(invoice_no, items, subtotal, discount, total, store_name, store_address, store_phone, currency_symbol, paper_width)
-        return send_raw_to_printer(raw, printer_name)
+    if not HAS_WIN32PRINT:
+        return False
 
-    is_80mm = "80" in str(paper_width)
-    img_width = 576 if is_80mm else 384
-    
-    # Estimate height based on items
-    base_height = 360 + len(items) * 32
-    img = Image.new("RGB", (img_width, base_height), color="white")
-    draw = ImageDraw.Draw(img)
-
-    try:
-        font_store = ImageFont.truetype("arialbd.ttf", 26 if is_80mm else 22)
-        font_bold = ImageFont.truetype("arialbd.ttf", 17 if is_80mm else 15)
-        font_reg = ImageFont.truetype("arial.ttf", 16 if is_80mm else 14)
-        font_small = ImageFont.truetype("arial.ttf", 14 if is_80mm else 12)
-    except Exception:
-        font_store = font_bold = font_reg = font_small = ImageFont.load_default()
-
-    margin = 14
-    content_width = img_width - 2 * margin
-    center_x = img_width // 2
-
-    y = 12
-    # Store Name & Header
-    draw.text((center_x, y), store_name or "MOIRA LUXE", fill="black", font=font_store, anchor="mt")
-    y += 34
-    if store_address:
-        draw.text((center_x, y), store_address, fill="black", font=font_small, anchor="mt")
-        y += 18
-    if store_phone:
-        draw.text((center_x, y), f"Ph: {store_phone}", fill="black", font=font_small, anchor="mt")
-        y += 18
-
-    # Divider
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=1)
-    y += 6
-
-    # Meta
-    draw.text((margin, y), f"Bill: {invoice_no}", fill="black", font=font_bold)
-    y += 22
-    draw.text((margin, y), "Cashier: Admin", fill="black", font=font_small)
-    y += 20
-
-    # Table Header
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=1)
-    y += 5
-    qty_x = int(img_width * 0.62)
-    draw.text((margin, y), "ITEM", fill="black", font=font_bold)
-    draw.text((qty_x, y), "QTY", fill="black", font=font_bold)
-    draw.text((img_width - margin, y), "AMOUNT", fill="black", font=font_bold, anchor="ra")
-    y += 22
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=1)
-    y += 8
-
-    # Items
-    curr = "Rs."
-    for item in items:
-        name = str(item.get("name", "Item"))
-        # shorten long names
-        if len(name) > 22:
-            name = name[:20] + ".."
-        qty = str(item.get("quantity", 1))
-        amt = f"{float(item.get('price', 0)):,.2f}"
-
-        draw.text((margin, y), name, fill="black", font=font_reg)
-        draw.text((qty_x + 8, y), qty, fill="black", font=font_reg)
-        draw.text((img_width - margin, y), amt, fill="black", font=font_reg, anchor="ra")
-        y += 26
-
-    y += 4
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=1)
-    y += 10
-
-    # Totals
-    draw.text((margin, y), "Subtotal:", fill="black", font=font_reg)
-    draw.text((img_width - margin, y), f"{curr} {subtotal:,.2f}", fill="black", font=font_reg, anchor="ra")
-    y += 24
-
-    if discount:
-        draw.text((margin, y), "Discount:", fill="black", font=font_reg)
-        draw.text((img_width - margin, y), f"-{curr} {discount:,.2f}", fill="black", font=font_reg, anchor="ra")
-        y += 24
-
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=1)
-    y += 6
-    draw.text((margin, y), "TOTAL:", fill="black", font=font_bold)
-    draw.text((img_width - margin, y), f"{curr} {total:,.2f}", fill="black", font=font_bold, anchor="ra")
-    y += 26
-    draw.line([(margin, y), (img_width - margin, y)], fill="black", width=2)
-    y += 16
-
-    draw.text((center_x, y), "Thank you for shopping!", fill="black", font=font_small, anchor="mt")
-    y += 35
-
-    # Crop image to actual drawn height
-    final_img = img.crop((0, 0, img_width, y))
+    import win32ui
+    import win32con
 
     target_printer = printer_name or get_default_printer_name()
     if not target_printer:
         raise ValueError("No printer specified and no default printer found.")
 
-    hDC = win32ui.CreateDC()
-    hDC.CreatePrinterDC(target_printer)
+    hdc = win32ui.CreateDC()
+    hdc.CreatePrinterDC(target_printer)
+
+    font_title = win32ui.CreateFont({
+        "name": "Consolas",
+        "height": 38,
+        "weight": win32con.FW_BOLD
+    })
+    font_text = win32ui.CreateFont({
+        "name": "Consolas",
+        "height": 27,
+        "weight": win32con.FW_NORMAL
+    })
+    font_bold = win32ui.CreateFont({
+        "name": "Consolas",
+        "height": 27,
+        "weight": win32con.FW_BOLD
+    })
+
+    curr = "Rs."
+    sep = "--------------------------------"
+
     try:
-        hDC.StartDoc(f"Receipt-{invoice_no}")
-        hDC.StartPage()
+        hdc.StartDoc(f"Bill-{invoice_no}")
+        hdc.StartPage()
 
-        dib = ImageWin.Dib(final_img)
-        # 1-to-1 draw coordinates to thermal head
-        dib.draw(hDC.GetHandleOutput(), (10, 10, img_width + 10, y + 10))
+        # Header
+        hdc.SelectObject(font_title)
+        clean_store = (store_name or "MOIRA LUXE").strip()
+        hdc.TextOut(135, 15, clean_store)
 
-        hDC.EndPage()
-        hDC.EndDoc()
+        # Meta
+        hdc.SelectObject(font_text)
+        y = 60
+        hdc.TextOut(20, y, sep)
+        y += 28
+        hdc.TextOut(20, y, f"Bill No: {invoice_no}")
+        y += 28
+        hdc.TextOut(20, y, sep)
+        y += 28
+
+        # Column Header
+        hdc.TextOut(20, y, "ITEM             QTY      AMOUNT")
+        y += 28
+        hdc.TextOut(20, y, sep)
+        y += 28
+
+        # Items
+        for item in items:
+            name = str(item.get("name", "Item"))[:14]
+            qty = str(item.get("quantity", 1))
+            amt = f"{float(item.get('price', 0)):>8.2f}"
+            line = f"{name:<14}   {qty:>3}   {amt}"
+            hdc.TextOut(20, y, line)
+            y += 28
+
+        hdc.TextOut(20, y, sep)
+        y += 28
+
+        # Totals
+        sub_str = f"Subtotal: {curr} {subtotal:,.2f}"
+        hdc.TextOut(150, y, sub_str)
+        y += 28
+
+        if discount:
+            disc_str = f"Discount: -{curr} {discount:,.2f}"
+            hdc.TextOut(150, y, disc_str)
+            y += 28
+
+        hdc.SelectObject(font_bold)
+        tot_str = f"TOTAL: {curr} {total:,.2f}"
+        hdc.TextOut(175, y, tot_str)
+        y += 45
+
+        # Footer
+        hdc.SelectObject(font_text)
+        hdc.TextOut(85, y, "Thank you for shopping!")
+
+        hdc.EndPage()
+        hdc.EndDoc()
     finally:
-        del hDC
+        del hdc
 
     return True
 
