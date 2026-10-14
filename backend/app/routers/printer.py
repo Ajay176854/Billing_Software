@@ -13,6 +13,7 @@ from app.services.printer_service import (
     get_default_printer_name,
     send_raw_to_printer,
     build_tspl_label,
+    build_tspl_receipt,
     build_escpos_receipt,
     print_receipt_gdi,
 )
