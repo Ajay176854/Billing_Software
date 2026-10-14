@@ -1,125 +1,336 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
+import { Printer, X, Zap } from 'lucide-react';
+import api from '../api/client';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 interface ProductLabelModalProps {
   isOpen: boolean;
   onClose: () => void;
   productCode: string;
   productName: string;
+  price?: number;
+  currencySymbol?: string;
 }
 
-const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, onClose, productCode, productName }) => {
+export type LabelLayout = '50x30' | '50x25' | '40x30' | 'standard';
+
+const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
+  isOpen,
+  onClose,
+  productCode,
+  productName,
+  price,
+  currencySymbol = '₹',
+}) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [labelSize, setLabelSize] = useState<LabelLayout>('50x30');
+  const [showPrice, setShowPrice] = useState(true);
+  const [showQr, setShowQr] = useState(false);
+  const [showStoreHeader, setShowStoreHeader] = useState(true);
+  const [copies, setCopies] = useState(1);
+  const storeName = 'MOIRA LUXE';
+  const [printingDirect, setPrintingDirect] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('hardware_label_size') as LabelLayout;
+    if (saved) setLabelSize(saved);
+  }, []);
 
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    if (printRef.current) {
-      const printContent = printRef.current.innerHTML;
-      
-      // Create a hidden iframe for printing to avoid 'about:blank' popup issues in PyWebView
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const iframeDoc = iframe.contentWindow?.document;
-      if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Label</title>');
-        iframeDoc.write('<style>');
-        iframeDoc.write(`
-          body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
-          .label-container { border: 1px dashed #ccc; padding: 20px; display: inline-block; }
-          .product-name { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; }
-          .qr-code { margin-bottom: 10px; }
-          @media print {
-            @page { margin: 0; size: auto; }
-            body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .label-container { border: none; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; page-break-inside: avoid; }
-            /* Ensure barcode and QR codes render crisply on thermal printers */
-            svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
-          }
-        `);
-        iframeDoc.write('</style></head><body>');
-        iframeDoc.write(printContent);
-        iframeDoc.write('</body></html>');
-        iframeDoc.close();
-        
-        // Wait for rendering
-        setTimeout(() => {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          // Cleanup iframe after printing
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 1000);
-        }, 250);
+  // Direct USB RAW TSPL printing (instantly prints directly to printer without any browser popup)
+  const handleDirectPrint = async () => {
+    setPrintingDirect(true);
+    try {
+      const dimensions = labelSize === '50x25' 
+        ? { width: 50, height: 25 } 
+        : labelSize === '40x30' 
+        ? { width: 40, height: 30 } 
+        : { width: 50, height: 30 };
+
+      // Send directly to local FastAPI server on port 8000
+      let res;
+      try {
+        res = await axios.post('http://127.0.0.1:8000/api/printer/print-label', {
+          product_name: productName,
+          barcode: productCode,
+          price: showPrice ? price : undefined,
+          store_name: showStoreHeader ? storeName : '',
+          copies: copies,
+          width_mm: dimensions.width,
+          height_mm: dimensions.height,
+          show_price: showPrice,
+          show_header: showStoreHeader,
+        });
+      } catch {
+        res = await api.post('/printer/print-label', {
+          product_name: productName,
+          barcode: productCode,
+          price: showPrice ? price : undefined,
+          store_name: showStoreHeader ? storeName : '',
+          copies: copies,
+          width_mm: dimensions.width,
+          height_mm: dimensions.height,
+          show_price: showPrice,
+          show_header: showStoreHeader,
+        });
       }
+
+      toast.success(res.data?.message || `Printed ${copies} label(s) directly to DEV 632-L58P!`);
+      localStorage.setItem('hardware_label_size', labelSize);
+      onClose();
+    } catch (err: any) {
+      console.error("Direct hardware print error:", err);
+      toast.error(err.response?.data?.detail || "Could not reach hardware printer. Ensure backend is running.");
+    } finally {
+      setPrintingDirect(false);
+    }
+  };
+
+  // Browser Print Preview Fallback
+  const handleBrowserPrint = () => {
+    if (!printRef.current) return;
+    localStorage.setItem('hardware_label_size', labelSize);
+
+    let combinedLabelsHtml = '';
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      combinedLabelsHtml += `
+        <div class="label-page">
+          ${printRef.current.innerHTML}
+        </div>
+      `;
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write('<!DOCTYPE html><html><head><title>Print Label</title>');
+      iframeDoc.write('<style>');
+      iframeDoc.write(`
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
+          text-align: center; 
+          margin: 0; 
+          padding: 0; 
+          background: #fff;
+          color: #000;
+        }
+        .label-page {
+          width: 50mm;
+          min-height: 30mm;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 1mm 1.5mm;
+          page-break-after: always;
+        }
+        .store-header { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 2px; }
+        .product-name { font-weight: 800; font-size: 14px; margin: 1px 0; max-height: 32px; overflow: hidden; line-height: 1.15; word-break: break-word; }
+        .price-tag { font-size: 16px; font-weight: 900; margin: 2px 0; }
+        .barcode-wrap { margin-top: 2px; display: flex; justify-content: center; width: 100%; }
+        svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
+        @media print {
+          @page { 
+            margin: 0; 
+            size: ${labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
+          }
+          body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .label-page { border: none !important; width: 100%; height: 100%; padding: 1mm; }
+        }
+      `);
+      iframeDoc.write('</style></head><body>');
+      iframeDoc.write(combinedLabelsHtml);
+      iframeDoc.write('</body></html>');
+      iframeDoc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1200);
+      }, 300);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800">Print Product Label</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 animate-scale-in">
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/70">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <Printer className="w-5 h-5 text-indigo-600" />
+              DEV 632-L58P Direct Label Print
+            </h2>
+            <p className="text-xs text-gray-500">Instant direct thermal hardware printing</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6">
-          <div 
-            ref={printRef}
-            className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-lg mb-6 bg-white"
-          >
-            <div className="label-container flex flex-col items-center">
-              <div className="text-center mb-2">
-                <h3 className="font-bold tracking-widest text-sm" style={{ color: '#000' }}>MOIRA LUXE</h3>
-                <div className="h-px w-12 bg-gray-300 mx-auto mt-1"></div>
+        <div className="p-6 space-y-6">
+          {/* Label Preview Card */}
+          <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Live Thermal Label Preview</span>
+            
+            <div
+              ref={printRef}
+              style={{
+                width: labelSize === '40x30' ? '180px' : '210px',
+                minHeight: labelSize === '50x25' ? '110px' : '135px',
+              }}
+              className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-2.5 flex flex-col items-center justify-center text-center shadow-xs"
+            >
+              {showStoreHeader && (
+                <div className="store-header text-[11px] font-black tracking-widest text-black border-b border-gray-400 pb-0.5 mb-1 w-full text-center">
+                  {storeName}
+                </div>
+              )}
+              
+              <div className="product-name text-[14px] font-black text-black leading-tight line-clamp-2 px-1 text-center">
+                {productName}
               </div>
-              <div className="product-name mt-2 mb-4 text-center font-bold text-gray-800">{productName}</div>
-              <div className="qr-code mb-4 bg-white p-2 border border-gray-100 rounded">
+
+              {showPrice && price !== undefined && (
+                <div className="price-tag text-[17px] font-black text-black my-1 text-center">
+                  MRP: {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
+
+              {showQr && (
+                <div className="my-1">
+                  {productCode ? (
+                    <QRCodeSVG value={productCode} size={64} level="M" />
+                  ) : (
+                    <div className="text-[10px] text-gray-400">No Code</div>
+                  )}
+                </div>
+              )}
+
+              <div className="barcode-wrap flex justify-center w-full mt-1">
                 {productCode ? (
-                  <QRCodeSVG value={productCode} size={128} level="M" includeMargin={true} />
+                  <Barcode
+                    value={productCode}
+                    height={labelSize === '50x25' ? 36 : 48}
+                    width={1.6}
+                    fontSize={12}
+                    margin={0}
+                    displayValue={true}
+                    background="#ffffff"
+                  />
                 ) : (
-                  <div className="w-32 h-32 flex items-center justify-center bg-gray-50 text-gray-400 text-sm text-center">No Code</div>
-                )}
-              </div>
-              <div className="barcode">
-                {productCode ? (
-                  <Barcode value={productCode} height={40} width={1.5} fontSize={14} background="#ffffff" />
-                ) : (
-                  <div className="h-10 text-gray-400 text-sm">No Barcode</div>
+                  <span className="text-[10px] text-gray-400">No Barcode</span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          {/* Controls & Presets */}
+          <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl text-xs">
+            <div>
+              <label className="font-semibold text-gray-700 block mb-1.5">Label Size</label>
+              <select
+                value={labelSize}
+                onChange={(e) => setLabelSize(e.target.value as LabelLayout)}
+                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
+              >
+                <option value="50x30">50 × 30 mm (Recommended)</option>
+                <option value="50x25">50 × 25 mm (Compact)</option>
+                <option value="40x30">40 × 30 mm</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-semibold text-gray-700 block mb-1.5">Number of Labels</label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={copies}
+                onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
+              />
+            </div>
+
+            <div className="col-span-2 flex flex-wrap gap-4 pt-1">
+              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showPrice}
+                  onChange={(e) => setShowPrice(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-0"
+                />
+                Show MRP Price
+              </label>
+
+              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showStoreHeader}
+                  onChange={(e) => setShowStoreHeader(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-0"
+                />
+                Store Header
+              </label>
+
+              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showQr}
+                  onChange={(e) => setShowQr(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-0"
+                />
+                Include QR Code
+              </label>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-between items-center gap-3 pt-2">
             <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-200 text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
+              type="button"
+              onClick={handleBrowserPrint}
+              className="text-xs text-gray-500 hover:text-gray-800 underline decoration-dotted"
+              title="Open browser print preview dialog"
             >
-              Close
+              Use Print Preview dialog
             </button>
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print Label
-            </button>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-100 transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={printingDirect}
+                onClick={handleDirectPrint}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                {printingDirect ? 'Printing...' : `Direct Print (${copies})`}
+              </button>
+            </div>
           </div>
         </div>
       </div>

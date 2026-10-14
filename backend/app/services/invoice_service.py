@@ -13,12 +13,14 @@ def get_store_settings(db: Session) -> dict:
     settings = db.query(Setting).all()
     settings_dict = {s.key: s.value for s in settings}
     return {
-        "store_name": settings_dict.get("store_name", "My Retail Store"),
+        "store_name": settings_dict.get("store_name", "MOIRA LUXE"),
         "store_address": settings_dict.get("store_address", ""),
         "store_phone": settings_dict.get("store_phone", ""),
         "store_email": settings_dict.get("store_email", ""),
         "store_gst": settings_dict.get("store_gst", ""),
-        "currency_symbol": settings_dict.get("currency_symbol", "₹"),
+        "currency_symbol": settings_dict.get("currency_symbol", "Rs."),
+        "receipt_width": settings_dict.get("receipt_width", "80mm"),
+        "auto_print": settings_dict.get("auto_print", "true"),
     }
 
 
@@ -30,6 +32,14 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
 
     store = get_store_settings(db)
     currency = store["currency_symbol"]
+    receipt_width = store.get("receipt_width", "58mm")
+    is_58mm = "58" in str(receipt_width)
+
+    max_width_px = "200px" if is_58mm else "290px"
+    font_size = "10.5px" if is_58mm else "12px"
+    store_font_size = "14px" if is_58mm else "17px"
+    barcode_width = 1.0 if is_58mm else 1.3
+    barcode_height = 28 if is_58mm else 36
 
     items_html = ""
     for idx, item in enumerate(sale.items, 1):
@@ -57,28 +67,61 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
             * {{ margin:0; padding:0; box-sizing:border-box; font-family:'Courier New', Courier, monospace; }}
-            body {{ color:#000; max-width:320px; margin:0 auto; padding:15px; font-size:12px; background:#fff; }}
-            .header {{ text-align:center; margin-bottom:15px; padding-bottom:10px; border-bottom:1px dashed #000; }}
-            .store-name {{ font-size:18px; font-weight:700; text-transform:uppercase; }}
-            .store-info {{ font-size:11px; margin-top:4px; }}
-            .invoice-meta {{ margin-bottom:15px; font-size:11px; padding-bottom:10px; border-bottom:1px dashed #000; }}
-            .invoice-meta div {{ margin-bottom:4px; }}
-            table {{ width:100%; border-collapse:collapse; margin-bottom:15px; font-size:12px; }}
-            th {{ border-bottom:1px dashed #000; padding:4px 0; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; }}
-            td {{ padding:2px 0; }}
-            .item-name {{ font-weight:700; padding-top:6px; }}
-            .item-details {{ font-size:11px; color:#333; }}
+            html, body {{ 
+                color:#000; 
+                background:#fff;
+                height:auto !important;
+                min-height:auto !important;
+            }}
+            body {{ 
+                max-width:{max_width_px}; 
+                margin:0 auto; 
+                padding:4px 8px; 
+                font-size:{font_size}; 
+            }}
+            .receipt-content {{
+                width: 100%;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }}
+            .header {{ text-align:center; margin-bottom:6px; padding-bottom:4px; border-bottom:1px dashed #000; }}
+            .store-name {{ font-size:{store_font_size}; font-weight:700; text-transform:uppercase; word-break:break-word; }}
+            .store-info {{ font-size:10px; margin-top:2px; line-height:1.2; }}
+            .invoice-meta {{ margin-bottom:6px; font-size:10px; padding-bottom:4px; border-bottom:1px dashed #000; }}
+            .invoice-meta div {{ margin-bottom:2px; }}
+            table {{ width:100%; border-collapse:collapse; margin-bottom:6px; font-size:{font_size}; table-layout:fixed; page-break-inside: avoid !important; }}
+            th {{ border-bottom:1px dashed #000; padding:2px; text-align:left; font-weight:700; font-size:10px; text-transform:uppercase; }}
+            th.th-item {{ width:48%; }}
+            th.th-disc {{ width:20%; text-align:center; }}
+            th.th-amount {{ width:32%; text-align:right; }}
+            td {{ padding:1px 2px; overflow:hidden; }}
+            .item-name {{ font-weight:700; padding-top:2px; word-break:break-word; }}
+            .item-details {{ font-size:10px; color:#111; }}
             .item-total {{ text-align:right; font-weight:700; }}
-            .totals {{ width:100%; font-size:12px; border-top:1px dashed #000; padding-top:10px; }}
-            .totals tr td {{ padding:4px 0; }}
-            .totals .grand-total {{ font-size:16px; font-weight:700; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:8px 0; }}
-            .footer {{ text-align:center; margin-top:15px; padding-top:10px; font-size:11px; }}
-            .barcode-container {{ text-align:center; margin-top:20px; display:flex; justify-content:center; }}
-            .barcode-container svg {{ shape-rendering: crispEdges; }}
+            .totals {{ width:100%; font-size:{font_size}; border-top:1px dashed #000; padding-top:3px; }}
+            .totals tr td {{ padding:1px 2px; }}
+            .totals .grand-total {{ font-size:13px; font-weight:700; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:4px 2px; }}
+            .footer {{ text-align:center; margin-top:6px; padding-top:4px; font-size:10px; page-break-inside: avoid !important; }}
+            .barcode-container {{ text-align:center; margin-top:6px; display:flex; justify-content:center; page-break-inside: avoid !important; }}
+            .barcode-container svg {{ shape-rendering: crispEdges; max-width: 90%; height: auto; }}
             @media print {{
-                @page {{ margin: 0; size: 80mm auto; }}
-                body {{ padding: 0; max-width: 100%; width: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
-                .no-print {{ display:none; }}
+                @page {{ 
+                    margin: 0 !important; 
+                    size: {receipt_width} auto; 
+                }}
+                html, body {{ 
+                    margin: 0 !important; 
+                    padding: 1mm 2mm !important; 
+                    width: 100% !important; 
+                    max-width: 100% !important; 
+                    -webkit-print-color-adjust: exact; 
+                    print-color-adjust: exact; 
+                }}
+                .receipt-content {{
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }}
+                .no-print {{ display:none !important; }}
             }}
         </style>
     </head>
@@ -87,58 +130,60 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
             <button onclick="window.print()" style="background:#0f172a; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:600; font-family:sans-serif;">🖨️ Print Receipt</button>
         </div>
         
-        <div class="header">
-            <div class="store-name">{store['store_name']}</div>
-            <div class="store-info">
-                {store['store_address']}<br>
-                {f"Ph: {store['store_phone']}" if store['store_phone'] else ""}
-                {f" | {store['store_email']}" if store['store_email'] else ""}
-                {f"<br>GST: {store['store_gst']}" if store['store_gst'] else ""}
+        <div class="receipt-content">
+            <div class="header">
+                <div class="store-name">{store['store_name']}</div>
+                <div class="store-info">
+                    {store['store_address']}<br>
+                    {f"Ph: {store['store_phone']}" if store['store_phone'] else ""}
+                    {f" | {store['store_email']}" if store['store_email'] else ""}
+                    {f"<br>GST: {store['store_gst']}" if store['store_gst'] else ""}
+                </div>
             </div>
-        </div>
 
-        <div class="invoice-meta">
-            <div><strong>Bill No:</strong> {sale.invoice_no}</div>
-            <div><strong>Date:</strong> {created}</div>
-            <div><strong>Cashier:</strong> {cashier}</div>
-            <div><strong>Payment:</strong> {sale.payment_method.upper()}</div>
-        </div>
+            <div class="invoice-meta">
+                <div><strong>Bill No:</strong> {sale.invoice_no}</div>
+                <div><strong>Date:</strong> {created}</div>
+                <div><strong>Cashier:</strong> {cashier}</div>
+                <div><strong>Payment:</strong> {sale.payment_method.upper()}</div>
+            </div>
 
-        {"" if not any([sale.customer_name, sale.customer_phone, sale.customer_place, sale.customer_email]) else f'''
-        <div style="margin-bottom:15px;font-size:11px; border-bottom:1px dashed #000; padding-bottom:10px;">
-            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Customer</div>
-            {f'<div>{sale.customer_name}</div>' if sale.customer_name else ''}
-            {f'<div>{sale.customer_phone}</div>' if sale.customer_phone else ''}
-        </div>
-        '''}
+            {"" if not any([sale.customer_name, sale.customer_phone, sale.customer_place, sale.customer_email]) else f'''
+            <div style="margin-bottom:15px;font-size:11px; border-bottom:1px dashed #000; padding-bottom:10px;">
+                <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Customer</div>
+                {f'<div>{sale.customer_name}</div>' if sale.customer_name else ''}
+                {f'<div>{sale.customer_phone}</div>' if sale.customer_phone else ''}
+            </div>
+            '''}
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th style="text-align:center;">Disc</th>
-                    <th style="text-align:right;">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {items_html}
-            </tbody>
-        </table>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="th-item">Item</th>
+                        <th class="th-disc">Disc</th>
+                        <th class="th-amount">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
 
-        <table class="totals">
-            <tr><td>Subtotal</td><td style="text-align:right;">{currency}{sale.subtotal:,.2f}</td></tr>
-            <tr><td>Discount</td><td style="text-align:right;">-{currency}{sale.discount:,.2f}</td></tr>
-            <tr><td>Tax</td><td style="text-align:right;">+{currency}{sale.tax:,.2f}</td></tr>
-            <tr class="grand-total"><td>Total</td><td style="text-align:right;">{currency}{sale.total:,.2f}</td></tr>
-        </table>
+            <table class="totals">
+                <tr><td>Subtotal</td><td style="text-align:right;">{currency} {sale.subtotal:,.2f}</td></tr>
+                <tr><td>Discount</td><td style="text-align:right;">-{currency} {sale.discount:,.2f}</td></tr>
+                <tr><td>Tax</td><td style="text-align:right;">+{currency} {sale.tax:,.2f}</td></tr>
+                <tr class="grand-total"><td>Total</td><td style="text-align:right;">{currency} {sale.total:,.2f}</td></tr>
+            </table>
 
-        <div class="barcode-container">
-            <svg id="barcode"></svg>
-        </div>
+            <div class="barcode-container">
+                <svg id="barcode"></svg>
+            </div>
 
-        <div class="footer">
-            <strong>Thank you for shopping!</strong><br>
-            {f"GSTIN: {store['store_gst']}" if store['store_gst'] else ""}
+            <div class="footer">
+                <strong>Thank you for shopping!</strong><br>
+                {f"GSTIN: {store['store_gst']}" if store['store_gst'] else ""}
+            </div>
         </div>
 
         <script>
@@ -146,17 +191,14 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
                 if (typeof JsBarcode !== 'undefined') {{
                     JsBarcode("#barcode", "{sale.invoice_no}", {{
                         format: "CODE128",
-                        width: 1.5,
-                        height: 40,
-                        fontSize: 12,
+                        width: {barcode_width},
+                        height: {barcode_height},
+                        fontSize: 11,
                         margin: 0,
                         displayValue: true,
                         fontOptions: "bold"
                     }});
                 }}
-                setTimeout(function() {{
-                    window.print();
-                }}, 800);
             }};
         </script>
     </body>

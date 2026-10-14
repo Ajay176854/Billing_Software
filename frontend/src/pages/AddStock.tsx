@@ -283,6 +283,7 @@ export default function AddStock() {
           onClose={() => setPrintProduct(null)}
           productCode={printProduct.barcode || printProduct.sku || ''}
           productName={printProduct.name}
+          price={printProduct.selling_price}
         />
       )}
     </div>

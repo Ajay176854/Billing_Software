@@ -32,7 +32,12 @@ def get_store_profile(db: Session = Depends(get_db), current_user=Depends(get_cu
         store_email=settings_dict.get("store_email", ""),
         store_gst=settings_dict.get("store_gst", ""),
         invoice_prefix=settings_dict.get("invoice_prefix", "INV"),
-        currency_symbol=settings_dict.get("currency_symbol", "₹"),
+        currency_symbol=settings_dict.get("currency_symbol", "Rs."),
+        receipt_width=settings_dict.get("receipt_width", "80mm"),
+        label_size=settings_dict.get("label_size", "50x30mm"),
+        printer_model=settings_dict.get("printer_model", "DEV 632-L58P (2-in-1 Receipt + Label)"),
+        scanner_model=settings_dict.get("scanner_model", "Helett HT20 (USB)"),
+        auto_print=settings_dict.get("auto_print", "false"),
     )
 
 

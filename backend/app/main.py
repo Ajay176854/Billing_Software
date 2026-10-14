@@ -10,7 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi import Request
-from app.routers import auth, users, products, categories, inventory, billing, sales, reports, settings as settings_router, backup
+from app.routers import auth, users, products, categories, inventory, billing, sales, reports, settings as settings_router, backup, printer
 from app.middleware import QueryCacheMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -82,6 +82,8 @@ app.include_router(sales.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
+app.include_router(printer.router, prefix="/api")
+
 
 
 # Rate Limiter

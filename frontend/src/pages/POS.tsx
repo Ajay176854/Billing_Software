@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, ShoppingCart, Camera, QrCode } from 'lucide-react';
@@ -222,6 +223,14 @@ export default function POS() {
       setCustomerPlace('');
       setCustomerEmail('');
       toast.success(`Sale completed! Invoice: ${res.data.invoice_no}`);
+
+      // Instantly print receipt to thermal printer like barcode label printer
+      directPrintReceipt(res.data.id);
+
+      // Focus back to barcode scanner immediately
+      setTimeout(() => {
+        barcodeRef.current?.focus();
+      }, 300);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Sale failed');
     } finally {
@@ -229,9 +238,19 @@ export default function POS() {
     }
   };
 
-  const printInvoice = (saleId: number) => {
-    const token = localStorage.getItem('token');
-    window.open(`/api/billing/invoice/${saleId}?token=${token}`, '_blank');
+  const directPrintReceipt = async (saleId: number) => {
+    try {
+      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`);
+      toast.success("Printed receipt directly to thermal printer!");
+    } catch {
+      try {
+        await api.post(`/printer/print-receipt/${saleId}`);
+        toast.success("Printed receipt directly to thermal printer!");
+      } catch (err: any) {
+        console.error("Direct receipt print failed:", err);
+        toast.error("Printer communication failed. Check printer connection.");
+      }
+    }
   };
 
   return (
@@ -578,16 +597,17 @@ export default function POS() {
             <p className="mt-1 text-xs text-text-muted capitalize">Paid via {completedSale.payment_method}</p>
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => printInvoice(completedSale.id)}
+                onClick={() => directPrintReceipt(completedSale.id)}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:text-accent"
               >
-                <Printer className="h-4 w-4" /> Print
+                <Printer className="h-4 w-4" /> Reprint
               </button>
               <button
+                autoFocus
                 onClick={() => { setCompletedSale(null); barcodeRef.current?.focus(); }}
                 className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex-1 rounded-lg py-2.5 text-sm font-semibold text-white"
               >
-                New Bill
+                New Bill (Ready to Scan)
               </button>
             </div>
           </div>

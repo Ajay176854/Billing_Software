@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import { Save, Database, Download, Edit2, Check, X, Trash2 } from 'lucide-react';
@@ -105,6 +106,101 @@ export default function SettingsPage() {
           <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </form>
+
+      {/* Hardware Configuration: Helett HT20 & DEV 632-L58P */}
+      <div className="rounded-xl border border-border bg-bg-card p-6 space-y-5">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Hardware & POS Peripherals
+            </h3>
+            <p className="text-xs text-text-muted mt-0.5">Configuration for Helett HT20 Scanner & DEV 632-L58P 2-in-1 Printer</p>
+          </div>
+          <span className="rounded-md bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">USB Plug & Play</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Scanner Card */}
+          <div className="rounded-lg border border-border bg-bg-hover/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-primary">Barcode Scanner</span>
+              <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 uppercase">Ready</span>
+            </div>
+            <div className="text-xs space-y-1">
+              <p className="font-medium text-text-primary">Helett HT20 (USB)</p>
+              <p className="text-text-muted text-[11px]">Mode: USB HID Keyboard Emulation</p>
+              <p className="text-text-muted text-[11px]">Speed buffer: 65ms auto-intercept</p>
+            </div>
+            <div className="pt-2 border-t border-border/50">
+              <label className="mb-1 block text-[11px] font-medium text-text-secondary">Scan Test Box (Try scanning any barcode):</label>
+              <input
+                type="text"
+                placeholder="Scan barcode here to test..."
+                className="w-full rounded-md border border-border bg-bg-input px-2.5 py-1.5 text-xs text-text-primary focus:border-accent"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    toast.success(`HT20 Detected Barcode: ${(e.target as HTMLInputElement).value}`);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Printer Card */}
+          <div className="rounded-lg border border-border bg-bg-hover/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-primary">2-in-1 Thermal Printer</span>
+              <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-400 uppercase">DEV 632-L58P</span>
+            </div>
+            
+            <div className="space-y-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Receipt Roll Width</label>
+                <select
+                  value={(form as any).receipt_width || '58mm'}
+                  onChange={(e) => setForm({ ...form, receipt_width: e.target.value } as any)}
+                  className="w-full rounded-md border border-border bg-bg-input px-2.5 py-1.5 text-xs text-text-primary"
+                >
+                  <option value="58mm">58mm Thermal (DEV L58P Native)</option>
+                  <option value="80mm">80mm Thermal (Standard POS)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Product Label Paper Size</label>
+                <select
+                  value={(form as any).label_size || '50x30mm'}
+                  onChange={(e) => setForm({ ...form, label_size: e.target.value } as any)}
+                  className="w-full rounded-md border border-border bg-bg-input px-2.5 py-1.5 text-xs text-text-primary"
+                >
+                  <option value="50x30mm">50 × 30 mm Thermal Die-Cut</option>
+                  <option value="50x25mm">50 × 25 mm Compact</option>
+                  <option value="40x30mm">40 × 30 mm Jewellery / Small Item</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const width = (form as any).receipt_width || '80mm';
+                    await axios.post(`http://127.0.0.1:8000/api/printer/test-receipt?paper_width=${width}`);
+                    toast.success(`Sent ${width} test receipt directly to printer!`);
+                  } catch (err: any) {
+                    toast.error(`Direct print failed: ${err?.response?.data?.detail || err.message}`);
+                  }
+                }}
+                className="w-full rounded-md border border-border py-1.5 text-xs font-medium text-text-primary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
+              >
+                🖨️ Test {(form as any).receipt_width || '80mm'} Receipt (Direct)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Backup */}
       <div className="rounded-xl border border-border bg-bg-card p-6">

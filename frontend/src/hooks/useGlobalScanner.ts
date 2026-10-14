@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Hook to listen for rapid keystrokes indicating a barcode scan
- * Scanners emulate a keyboard but type incredibly fast (e.g. 5-30ms per character).
+ * Scanners like Helett HT20 emulate USB HID keyboards and emit characters at ~10-40ms intervals,
+ * terminated by an Enter keystroke.
  */
 export function useGlobalScanner(onScan: (barcode: string) => void) {
   const barcodeBuffer = useRef('');
@@ -10,39 +11,45 @@ export function useGlobalScanner(onScan: (barcode: string) => void) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is explicitly typing into an input field,
-      // EXCEPT if it's the barcode input itself (we let the input handle it, or we handle it here).
       const activeEl = document.activeElement;
       const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
       
-      // If the barcode input has focus, let the input's own onKeyDown handle it
-      if (isInputFocused && activeEl.id === 'pos-barcode') return;
-      if (isInputFocused && activeEl.id === 'add-stock-barcode') return;
+      // If the dedicated barcode input has focus, let the input's own onKeyDown handle it
+      if (isInputFocused && (activeEl.id === 'pos-barcode' || activeEl.id === 'add-stock-barcode')) {
+        return;
+      }
       
-      // We only care about single printable characters or Enter
-      if (e.key.length !== 1 && e.key !== 'Enter') return;
-
+      // If user is actively typing inside customer name/phone/notes fields, don't hijack unless scanned fast
       const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime.current;
       
-      // If more than 50ms passed since last key, reset buffer (it's human typing)
-      if (currentTime - lastKeyTime.current > 50) {
+      // If Enter is pressed
+      if (e.key === 'Enter') {
+        const cleaned = barcodeBuffer.current.trim();
+        if (cleaned.length >= 2) {
+          onScan(cleaned);
+          barcodeBuffer.current = '';
+          e.preventDefault();
+          return;
+        }
+        barcodeBuffer.current = '';
+        return;
+      }
+
+      // Ignore non-printable keys
+      if (e.key.length !== 1) return;
+
+      // Helett HT20 USB HID typing speed: characters arrive within 65ms
+      if (timeDiff > 65) {
         barcodeBuffer.current = '';
       }
 
       lastKeyTime.current = currentTime;
-
-      if (e.key === 'Enter') {
-        if (barcodeBuffer.current.length > 2) { // Valid barcode length check
-          onScan(barcodeBuffer.current);
-          e.preventDefault();
-        }
-        barcodeBuffer.current = '';
-      } else {
-        barcodeBuffer.current += e.key;
-      }
+      barcodeBuffer.current += e.key;
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onScan]);
 }
+

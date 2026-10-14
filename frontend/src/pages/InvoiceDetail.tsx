@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -37,9 +38,24 @@ export default function InvoiceDetail() {
     } catch (err: any) { toast.error(err.response?.data?.detail || 'Failed'); }
   };
 
-  const printInvoice = () => { 
-    const token = localStorage.getItem('token');
-    window.open(`/api/billing/invoice/${id}?token=${token}`, '_blank'); 
+  const [printing, setPrinting] = useState(false);
+
+  const printInvoice = async () => { 
+    if (printing) return;
+    setPrinting(true);
+    try {
+      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${id}`);
+      toast.success("Printed receipt directly to thermal printer!");
+    } catch {
+      try {
+        await api.post(`/printer/print-receipt/${id}`);
+        toast.success("Printed receipt directly to thermal printer!");
+      } catch (err: any) {
+        toast.error(`Print failed: ${err?.response?.data?.detail || err.message}`);
+      }
+    } finally {
+      setPrinting(false);
+    }
   };
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>;
@@ -54,7 +70,13 @@ export default function InvoiceDetail() {
           <p className="text-sm text-text-muted">{sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : ''}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={printInvoice} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:border-accent hover:text-accent"><Printer className="h-4 w-4" /> Print</button>
+          <button 
+            onClick={printInvoice} 
+            disabled={printing}
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            <Printer className="h-4 w-4" /> {printing ? "Printing..." : "Print"}
+          </button>
           {isAdmin && sale.status === 'completed' && (
             <button onClick={handleCancelClick} className="flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/5 px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10"><XCircle className="h-4 w-4" /> Cancel Sale</button>
           )}

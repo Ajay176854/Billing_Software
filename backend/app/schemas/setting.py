@@ -28,4 +28,10 @@ class StoreProfile(BaseModel):
     store_email: str = ""
     store_gst: str = ""
     invoice_prefix: str = "INV"
-    currency_symbol: str = "₹"
+    currency_symbol: str = "Rs."
+    receipt_width: str = "58mm"
+    label_size: str = "50x30mm"
+    printer_model: str = "DEV 632-L58P (2-in-1 Receipt + Label)"
+    scanner_model: str = "Helett HT20 (USB)"
+    auto_print: str = "false"
+
