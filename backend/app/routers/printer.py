@@ -112,6 +112,14 @@ def direct_print_receipt(
     else:
         raise HTTPException(status_code=404, detail="Sale not found")
 
+    # Format creation date/time if available
+    created_at_str = None
+    if sale and sale.created_at:
+        try:
+            created_at_str = sale.created_at.strftime("%d-%m-%Y  %I:%M %p")
+        except Exception:
+            pass
+
     try:
         print_receipt_direct(
             invoice_no=invoice_no,
@@ -120,10 +128,11 @@ def direct_print_receipt(
             discount=discount,
             total=total,
             store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
-            store_address=(payload and payload.store_address) or store.get("store_address", ""),
-            store_phone=(payload and payload.store_phone) or store.get("store_phone", ""),
+            store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
+            store_phone=(payload and payload.store_phone) or store.get("store_phone", "8438353504"),
             currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
             paper_width=(payload and payload.paper_width) or store.get("receipt_width", "58mm"),
+            created_at=created_at_str,
         )
         return {"status": "ok", "message": f"Printed receipt for {invoice_no}"}
     except Exception as e:

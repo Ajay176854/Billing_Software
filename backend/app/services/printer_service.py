@@ -3,6 +3,7 @@ Printer Service — Direct USB/Hardware RAW printing for TSPL (labels) and ESC/P
 Bypasses the browser print preview dialog and prints directly to the physical printer.
 """
 import sys
+from datetime import datetime
 from typing import List, Optional
 
 try:
@@ -115,39 +116,55 @@ def build_tspl_receipt(
     discount: float,
     total: float,
     store_name: str = "MOIRA LUXE",
-    store_address: str = "",
-    store_phone: str = "",
+    store_address: str = "Thuckalay",
+    store_phone: str = "8438353504",
     currency_symbol: str = "Rs.",
     paper_width: str = "58mm",
+    created_at: Optional[str] = None,
 ) -> bytes:
     """
-    Generate the perfected full-width TSPL receipt with comfortable top margin,
-    prominent store title, edge-to-edge formatting, and tight zero-waste height.
+    Generate the perfected full-width TSPL receipt with:
+    - Prominent MOIRA LUXE header
+    - Address: Thuckalay
+    - Phone: 8438353504
+    - Bill No & Date / Time
+    - Edge-to-edge formatting and tight zero-waste height.
     """
     clean_store = (store_name or "MOIRA LUXE").replace('"', '').strip()
+    address = (store_address or "Thuckalay").replace('"', '').strip()
+    phone = (store_phone or "8438353504").replace('"', '').strip()
     clean_inv = str(invoice_no).replace('"', '').strip()
     curr = "Rs."
     sep = "--------------------------------------------"
 
+    # Current date and time (e.g. "14-10-2026 12:45 PM")
+    if created_at:
+        date_str = str(created_at)
+    else:
+        date_str = datetime.now().strftime("%d-%m-%Y  %I:%M %p")
+
     # Calculate exact tight height in mm (dots / 8 at 203 DPI)
-    # Top + Title: ~110 dots, Meta/Header: ~90 dots, Each item: ~30 dots, Totals: ~90 dots, Footer: ~60 dots
-    needed_dots = 200 + (len(items) * 30) + (30 if discount else 0) + 150
-    height_mm = max(55, int(needed_dots / 8.0) + 4)
+    # Header & Meta: ~260 dots, Each item: ~30 dots, Totals: ~90 dots, Footer: ~60 dots
+    needed_dots = 270 + (len(items) * 30) + (30 if discount else 0) + 150
+    height_mm = max(65, int(needed_dots / 8.0) + 4)
 
     commands = [
         f"SIZE 54 mm, {height_mm} mm",
         "GAP 0 mm, 0 mm",
         "DIRECTION 1",
         "CLS",
-        f'TEXT 70,30,"3",0,2,2,"{clean_store}"',
-        f'TEXT 10,90,"2",0,1,1,"{sep}"',
-        f'TEXT 15,115,"3",0,1,1,"Bill No: {clean_inv}"',
-        f'TEXT 10,145,"2",0,1,1,"{sep}"',
-        f'TEXT 15,170,"3",0,1,1,"ITEM                  QTY     AMOUNT"',
-        f'TEXT 10,200,"2",0,1,1,"{sep}"',
+        f'TEXT 70,25,"3",0,2,2,"{clean_store}"',
+        f'TEXT 135,78,"2",0,1,1,"{address}"',
+        f'TEXT 105,102,"2",0,1,1,"Ph: {phone}"',
+        f'TEXT 10,126,"2",0,1,1,"{sep}"',
+        f'TEXT 15,148,"3",0,1,1,"Bill No: {clean_inv}"',
+        f'TEXT 15,176,"2",0,1,1,"Date: {date_str}"',
+        f'TEXT 10,202,"2",0,1,1,"{sep}"',
+        f'TEXT 15,226,"3",0,1,1,"ITEM                  QTY     AMOUNT"',
+        f'TEXT 10,254,"2",0,1,1,"{sep}"',
     ]
 
-    y = 225
+    y = 280
     for item in items:
         name = str(item.get("name", "Item"))[:20].replace('"', '').strip()
         qty = item.get("quantity", 1)
@@ -186,11 +203,12 @@ def print_receipt_direct(
     discount: float,
     total: float,
     store_name: str = "MOIRA LUXE",
-    store_address: str = "",
-    store_phone: str = "",
+    store_address: str = "Thuckalay",
+    store_phone: str = "8438353504",
     currency_symbol: str = "Rs.",
     paper_width: str = "58mm",
-    printer_name: Optional[str] = None
+    printer_name: Optional[str] = None,
+    created_at: Optional[str] = None,
 ) -> bool:
     """
     Direct TSPL hardware print to the user's DEV 632 printer.
@@ -207,6 +225,7 @@ def print_receipt_direct(
         store_phone=store_phone,
         currency_symbol=currency_symbol,
         paper_width=paper_width,
+        created_at=created_at,
     )
     target = printer_name or get_default_printer_name()
     return send_raw_to_printer(raw_data, target)
