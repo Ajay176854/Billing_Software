@@ -240,15 +240,19 @@ export default function POS() {
 
   const directPrintReceipt = async (saleId: number) => {
     try {
+      // 1. Direct hardware print to local Windows spooler
       await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`);
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
+        // 2. Direct print via API
         await api.post(`/printer/print-receipt/${saleId}`);
         toast.success("Printed receipt directly to thermal printer!");
       } catch (err: any) {
-        console.error("Direct receipt print failed:", err);
-        toast.error("Printer communication failed. Check printer connection.");
+        console.warn("Direct spooler not active, falling back to browser receipt preview:", err);
+        const token = localStorage.getItem('token');
+        const printUrl = `/api/billing/invoice/${saleId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+        window.open(printUrl, '_blank', 'width=450,height=650');
       }
     }
   };

@@ -44,14 +44,24 @@ export default function InvoiceDetail() {
     if (printing) return;
     setPrinting(true);
     try {
+      // 1. Try direct hardware print to local USB printer spooler
       await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${id}`);
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
+        // 2. Try direct print via current API
         await api.post(`/printer/print-receipt/${id}`);
         toast.success("Printed receipt directly to thermal printer!");
-      } catch (err: any) {
-        toast.error(`Print failed: ${err?.response?.data?.detail || err.message}`);
+      } catch {
+        // 3. Fallback for pure cloud / remote browser: open clean printable invoice HTML popup
+        const token = localStorage.getItem('token');
+        const printUrl = `/api/billing/invoice/${id}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+        const win = window.open(printUrl, '_blank', 'width=450,height=650');
+        if (win) {
+          toast.success("Opened printable receipt preview!");
+        } else {
+          toast.error("Please allow popups to print receipt");
+        }
       }
     } finally {
       setPrinting(false);
