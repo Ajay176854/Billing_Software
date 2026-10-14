@@ -112,7 +112,7 @@ def direct_print_receipt(
         raise HTTPException(status_code=404, detail="Sale not found")
 
     try:
-        raw_bytes = build_tspl_receipt(
+        print_receipt_gdi(
             invoice_no=invoice_no,
             items=items_data,
             subtotal=subtotal,
@@ -124,7 +124,6 @@ def direct_print_receipt(
             currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
             paper_width=(payload and payload.paper_width) or store.get("receipt_width", "58mm"),
         )
-        send_raw_to_printer(raw_bytes)
         return {"status": "ok", "message": f"Printed receipt for {invoice_no}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Direct receipt print failed: {str(e)}")
@@ -146,7 +145,7 @@ def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depen
     total = 2600.00
     
     try:
-        raw_bytes = build_tspl_receipt(
+        print_receipt_gdi(
             invoice_no="TEST-0001",
             items=test_items,
             subtotal=subtotal,
@@ -158,7 +157,6 @@ def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depen
             currency_symbol=store.get("currency_symbol", "Rs."),
             paper_width=chosen_width,
         )
-        send_raw_to_printer(raw_bytes)
         return {"status": "ok", "message": f"Printed test receipt ({chosen_width})"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Direct test receipt print failed: {str(e)}")
