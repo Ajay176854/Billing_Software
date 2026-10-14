@@ -16,6 +16,7 @@ from app.services.printer_service import (
     build_tspl_receipt,
     build_escpos_receipt,
     print_receipt_gdi,
+    print_receipt_direct,
 )
 
 router = APIRouter(prefix="/printer", tags=["Printer"])
@@ -112,7 +113,7 @@ def direct_print_receipt(
         raise HTTPException(status_code=404, detail="Sale not found")
 
     try:
-        print_receipt_gdi(
+        print_receipt_direct(
             invoice_no=invoice_no,
             items=items_data,
             subtotal=subtotal,
@@ -145,7 +146,7 @@ def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depen
     total = 2600.00
     
     try:
-        print_receipt_gdi(
+        print_receipt_direct(
             invoice_no="TEST-0001",
             items=test_items,
             subtotal=subtotal,
