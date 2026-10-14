@@ -98,21 +98,23 @@ export default function UsersPage() {
                   <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${u.status === 'active' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>{u.status}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  {u.username === 'moira_admin' ? (
-                    <span className="text-xs text-text-muted italic">System Admin</span>
-                  ) : (
-                    <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => { setEditingUser(u); setForm({ name: u.name, username: u.username, email: u.email || '', password: '', role: u.role }); setShowModal(true); }} className="rounded-lg p-1 text-accent hover:bg-accent/10 transition-colors" title="Edit User">
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
-                        {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button onClick={() => setUserToDelete(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={() => { setEditingUser(u); setForm({ name: u.name, username: u.username, email: u.email || '', password: '', role: u.role }); setShowModal(true); }} className="rounded-lg p-1 text-accent hover:bg-accent/10 transition-colors" title="Edit User & Password">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    {u.username === 'moira_admin' ? (
+                      <span className="text-[11px] text-text-muted px-2 py-0.5 rounded bg-bg-hover">Primary</span>
+                    ) : (
+                      <>
+                        <button onClick={() => toggleStatus(u)} className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${u.status === 'active' ? 'text-danger hover:bg-danger/10' : 'text-success hover:bg-success/10'}`}>
+                          {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button onClick={() => setUserToDelete(u)} className="rounded-lg p-1 text-danger hover:bg-danger/10 transition-colors" title="Delete User">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

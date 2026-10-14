@@ -38,6 +38,11 @@ class PasswordReset(BaseModel):
     new_password: str = Field(..., min_length=6)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+
+
 class UserResponse(BaseModel):
     id: int
     name: str

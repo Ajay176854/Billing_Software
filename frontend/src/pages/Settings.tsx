@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
-import { Save, Database, Download, Edit2, Check, X, Trash2 } from 'lucide-react';
+import { Save, Database, Download, Edit2, Check, X, Trash2, Lock } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export default function SettingsPage() {
@@ -10,6 +10,10 @@ export default function SettingsPage() {
   const [backups, setBackups] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+
+  // Security: Admin Password Change State
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
   
   const [categories, setCategories] = useState<any[]>([]);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
@@ -84,6 +88,30 @@ export default function SettingsPage() {
     setBackingUp(false);
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwordForm.new_password.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.post('/auth/change-password', {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      toast.success('Admin password changed successfully!');
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to change password');
+    }
+    setChangingPassword(false);
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -104,6 +132,63 @@ export default function SettingsPage() {
         </div>
         <button type="submit" disabled={saving} className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 disabled:opacity-50">
           <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+      </form>
+
+      {/* Security: Change Password */}
+      <form onSubmit={handleChangePassword} className="rounded-xl border border-border bg-bg-card p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Lock className="h-4 w-4 text-accent" />
+              Change Admin Password
+            </h3>
+            <p className="text-xs text-text-muted mt-0.5">Update the master login password for your administrator account</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Current Password *</label>
+            <input
+              type="password"
+              required
+              value={passwordForm.current_password}
+              onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">New Password *</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={passwordForm.new_password}
+              onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+              placeholder="Min 6 characters"
+              className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Confirm New Password *</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={passwordForm.confirm_password}
+              onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+              placeholder="Repeat new password"
+              className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary"
+            />
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={changingPassword}
+          className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 disabled:opacity-50"
+        >
+          <Lock className="h-4 w-4" /> {changingPassword ? 'Updating...' : 'Update Password'}
         </button>
       </form>
 
