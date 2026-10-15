@@ -139,9 +139,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           padding: 1mm 1.5mm;
           page-break-after: always;
         }
-        .store-header { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 2px; }
-        .product-name { font-weight: 800; font-size: 14px; margin: 1px 0; max-height: 32px; overflow: hidden; line-height: 1.15; word-break: break-word; }
-        .price-tag { font-size: 16px; font-weight: 900; margin: 2px 0; }
+        .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 2px; }
+        .store-header { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; text-align: left; }
+        .price-tag { font-size: 11px; font-weight: 700; white-space: nowrap; margin-left: 4px; text-align: right; }
+        .product-name { font-weight: 700; font-size: 13px; margin: 2px 0 3px 0; max-height: 34px; overflow: hidden; line-height: 1.15; word-break: break-word; text-align: center; width: 100%; }
         .barcode-wrap { margin-top: 2px; display: flex; justify-content: center; width: 100%; }
         svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
         @media print {
@@ -198,21 +199,27 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
               }}
               className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-2.5 flex flex-col items-center justify-center text-center shadow-xs"
             >
-              {showStoreHeader && (
-                <div className="store-header text-[11px] font-black tracking-widest text-black border-b border-gray-400 pb-0.5 mb-1 w-full text-center">
-                  {storeName}
-                </div>
-              )}
+              {/* Top row: Shop name on left/center & Price on top right */}
+              <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-0.5 mb-1.5">
+                {showStoreHeader ? (
+                  <div className="store-header text-[11px] font-bold tracking-wider text-black">
+                    {storeName}
+                  </div>
+                ) : (
+                  <div></div>
+                )}
+                
+                {showPrice && price !== undefined && (
+                  <div className="price-tag text-[11px] font-bold text-black tracking-tight whitespace-nowrap ml-auto">
+                    {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </div>
+                )}
+              </div>
               
-              <div className="product-name text-[14px] font-black text-black leading-tight line-clamp-2 px-1 text-center">
+              {/* Product name slightly smaller */}
+              <div className="product-name text-[13px] font-bold text-black leading-tight line-clamp-2 px-1 text-center w-full my-0.5">
                 {productName}
               </div>
-
-              {showPrice && price !== undefined && (
-                <div className="price-tag text-[17px] font-black text-black my-1 text-center">
-                  MRP: {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              )}
 
               {showQr && (
                 <div className="my-1">

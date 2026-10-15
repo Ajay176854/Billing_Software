@@ -16,6 +16,12 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.redis = redis.from_url(settings.REDIS_URL, decode_responses=False)
 
+    async def _safe_flush(self):
+        try:
+            await asyncio.wait_for(self.redis.flushdb(), timeout=2.0)
+        except Exception as e:
+            print(f"Background Redis cache clear notice: {e}")
+
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
@@ -25,14 +31,12 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
 
         method = request.method
 
-        # If it's a mutation, clear the cache for that resource group
+        # If it's a mutation, clear the cache for that resource group in the background without blocking the user
         if method in ["POST", "PUT", "DELETE", "PATCH"]:
-            try:
-                await asyncio.wait_for(self.redis.flushdb(), timeout=2.0)
-            except Exception as e:
-                # Fallback if Redis is down, we just proceed
-                print(f"Redis cache clear error: {e}")
-            return await call_next(request)
+            response = await call_next(request)
+            if response.status_code < 400:
+                asyncio.create_task(self._safe_flush())
+            return response
 
         # Only cache GET requests
         if method != "GET":

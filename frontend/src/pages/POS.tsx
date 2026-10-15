@@ -60,8 +60,41 @@ export default function POS() {
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // In-memory catalog cache for 0ms instant barcode scanning
+  const catalogRef = useRef<{ barcodeMap: Map<string, any>; idMap: Map<number, any>; list: any[] }>({
+    barcodeMap: new Map(),
+    idMap: new Map(),
+    list: []
+  });
+
   const barcodeRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Prefetch entire active catalog into browser memory on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadCatalog = async () => {
+      try {
+        const res = await api.get('/products');
+        if (!isMounted) return;
+        const bMap = new Map<string, any>();
+        const iMap = new Map<number, any>();
+        const list = Array.isArray(res.data) ? res.data : [];
+
+        for (const p of list) {
+          if (p.barcode) bMap.set(String(p.barcode).trim().toUpperCase(), p);
+          if (p.sku) bMap.set(String(p.sku).trim().toUpperCase(), p);
+          iMap.set(p.id, p);
+        }
+
+        catalogRef.current = { barcodeMap: bMap, idMap: iMap, list };
+      } catch (err) {
+        console.error("Failed to preload local catalog cache:", err);
+      }
+    };
+    loadCatalog();
+    return () => { isMounted = false; };
+  }, []);
 
   // Auto-focus barcode input
   useEffect(() => {
@@ -87,12 +120,28 @@ export default function POS() {
     return () => clearTimeout(t);
   }, [customerPhone, customerName]);
 
-  // Reusable barcode lookup
+  // Reusable 0ms barcode lookup with instant memory resolution
   const processBarcode = async (barcode: string) => {
-    if (!barcode.trim()) return;
+    const cleanCode = barcode.trim().toUpperCase();
+    if (!cleanCode) return;
+
+    // 1. Instant check from local in-memory catalog (0ms latency!)
+    const localProduct = catalogRef.current.barcodeMap.get(cleanCode);
+    if (localProduct) {
+      addToCart(localProduct);
+      return;
+    }
+
+    // 2. Fallback to API if not present in memory cache (e.g. brand new product)
     try {
-      const res = await api.get(`/products/barcode/${barcode.trim()}`);
-      addToCart(res.data);
+      const res = await api.get(`/products/barcode/${cleanCode}`);
+      if (res.data) {
+        // Cache it for subsequent scans
+        if (res.data.barcode) catalogRef.current.barcodeMap.set(String(res.data.barcode).trim().toUpperCase(), res.data);
+        if (res.data.sku) catalogRef.current.barcodeMap.set(String(res.data.sku).trim().toUpperCase(), res.data);
+        catalogRef.current.idMap.set(res.data.id, res.data);
+        addToCart(res.data);
+      }
     } catch {
       toast.error(`Unknown barcode: ${barcode}`);
     }
@@ -108,17 +157,30 @@ export default function POS() {
     setBarcodeInput('');
   };
 
-  // Search products
-  const handleSearch = useCallback(async (q: string) => {
-    if (q.length < 2) { setSearchResults([]); return; }
-    try {
-      const res = await api.get(`/products?search=${q}`);
-      setSearchResults(res.data);
-    } catch { setSearchResults([]); }
+  // Search products instantly from memory or fallback
+  const handleSearch = useCallback((q: string) => {
+    const cleanQ = q.trim().toLowerCase();
+    if (cleanQ.length < 2) { setSearchResults([]); return; }
+
+    // Instant filter from memory if catalog is loaded
+    if (catalogRef.current.list.length > 0) {
+      const filtered = catalogRef.current.list.filter(p =>
+        (p.name && p.name.toLowerCase().includes(cleanQ)) ||
+        (p.barcode && p.barcode.toLowerCase().includes(cleanQ)) ||
+        (p.sku && p.sku.toLowerCase().includes(cleanQ))
+      ).slice(0, 20);
+      setSearchResults(filtered);
+      return;
+    }
+
+    // Fallback to API
+    api.get(`/products?search=${q}`)
+      .then(res => setSearchResults(res.data))
+      .catch(() => setSearchResults([]));
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => handleSearch(searchQuery), 300);
+    const timer = setTimeout(() => handleSearch(searchQuery), 150);
     return () => clearTimeout(timer);
   }, [searchQuery, handleSearch]);
 
@@ -213,6 +275,14 @@ export default function POS() {
         customer_email: customerEmail || undefined,
       });
       setCompletedSale({ id: res.data.id, invoice_no: res.data.invoice_no, total: res.data.total, payment_method: res.data.payment_method });
+      // Update in-memory stock immediately for purchased items
+      for (const item of cart) {
+        const prod = catalogRef.current.idMap.get(item.product_id);
+        if (prod) {
+          prod.stock_qty = Math.max(0, prod.stock_qty - item.quantity);
+        }
+      }
+
       const emptyCart: CartItem[] = [];
       setCart(emptyCart);
       saveCart(emptyCart);

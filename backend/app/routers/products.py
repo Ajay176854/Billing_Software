@@ -98,21 +98,24 @@ def get_next_code(
             # Fallback: take first 3 letters of category name
             actual_prefix = "".join(c for c in cat.name if c.isalpha())[:3].upper()
 
-    # Find highest number for this prefix
+    # Find highest number for this prefix with fast indexed queries
     like_pattern = f"{actual_prefix}-%"
-    products = db.query(Product).filter(
-        or_(Product.barcode.like(like_pattern), Product.sku.like(like_pattern))
-    ).all()
+    latest_product = (
+        db.query(Product.barcode, Product.sku)
+        .filter(or_(Product.barcode.like(like_pattern), Product.sku.like(like_pattern)))
+        .order_by(Product.id.desc())
+        .first()
+    )
 
     max_num = 0
-    for p in products:
-        for code in [p.barcode, p.sku]:
+    if latest_product:
+        for code in [latest_product.barcode, latest_product.sku]:
             if code and code.startswith(f"{actual_prefix}-"):
                 try:
                     num = int(code.split("-")[1])
                     if num > max_num:
                         max_num = num
-                except ValueError:
+                except (ValueError, IndexError):
                     pass
 
     next_num = max_num + 1

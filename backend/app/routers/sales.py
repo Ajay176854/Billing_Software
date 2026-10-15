@@ -61,10 +61,23 @@ def list_sales(
 
 @router.get("/customers/search")
 def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """Search unique customers by phone or name from previous sales."""
+    """Search unique customers by phone or name from previous sales with caching."""
+    clean_q = q.strip()
+    cache_key = f"cust_search_{clean_q.lower()}"
+    from app.cache import cache
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Phone numbers are typically searched by prefix (starting with numbers), name with substring
+    if clean_q.isdigit():
+        filter_condition = Sale.customer_phone.like(f"{clean_q}%")
+    else:
+        filter_condition = Sale.customer_phone.ilike(f"%{clean_q}%") | Sale.customer_name.ilike(f"%{clean_q}%")
+
     customers = (
         db.query(Sale.customer_phone, Sale.customer_name, Sale.customer_place, Sale.customer_email)
-        .filter(Sale.customer_phone.ilike(f"%{q}%") | Sale.customer_name.ilike(f"%{q}%"))
+        .filter(filter_condition)
         .filter(Sale.customer_phone.is_not(None))
         .filter(Sale.customer_phone != "")
         .distinct()
@@ -72,7 +85,7 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
         .all()
     )
 
-    return [
+    results = [
         {
             "phone": c.customer_phone,
             "name": c.customer_name,
@@ -81,6 +94,8 @@ def search_customers(q: str = Query(..., min_length=2), db: Session = Depends(ge
         }
         for c in customers
     ]
+    cache.set(cache_key, results, ttl=180)  # 3 min cache
+    return results
 
 
 @router.get("/{sale_id}", response_model=SaleResponse)

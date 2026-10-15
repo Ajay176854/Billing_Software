@@ -84,24 +84,26 @@ def build_tspl_label(
         "CLS",
     ]
 
-    y = 20
+    # If showing header and price: Header on top-left/center, Price at top-right
+    # Shop Name (subtle, clean size)
     if show_header and store_name:
         clean_store = store_name.replace('"', '').strip()
-        lines.append(f'TEXT 40,{y},"3",0,1,1,"{clean_store}"')
-        y += 35
+        # Font "3" 1x1 or font "2" 1x1 for a neat, slightly smaller Moira Luxe header
+        lines.append(f'TEXT 25,20,"3",0,1,1,"{clean_store}"')
 
-    clean_name = product_name[:20].replace('"', '').strip()
-    lines.append(f'TEXT 40,{y},"3",0,1,1,"{clean_name}"')
-    y += 38
-
+    # Price at top-right
     if show_price and price is not None:
-        price_str = f"MRP: Rs. {price:,.2f}"
-        lines.append(f'TEXT 40,{y},"3",0,1,2,"{price_str}"')
-        y += 45
+        price_str = f"Rs.{price:,.0f}" if price == int(price) else f"Rs.{price:,.2f}"
+        lines.append(f'TEXT 280,20,"2",0,1,1,"{price_str}"')
 
+    # Product Name (neatly scaled down to avoid looking oversized)
+    clean_name = product_name[:26].replace('"', '').strip()
+    lines.append(f'TEXT 25,55,"3",0,1,1,"{clean_name}"')
+
+    # Barcode
     if barcode:
         clean_code = str(barcode).strip().replace('"', '')
-        lines.append(f'BARCODE 40,{y},"128",50,1,0,2,4,"{clean_code}"')
+        lines.append(f'BARCODE 25,115,"128",55,1,0,2,4,"{clean_code}"')
 
     lines.append(f"PRINT {max(1, copies)}")
     lines.append("")

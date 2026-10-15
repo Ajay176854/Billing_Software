@@ -25,33 +25,62 @@ from app.schemas.sale import BillRequest
 
 
 def generate_invoice_number(db: Session) -> str:
-    """Generate a unique invoice number: PREFIX-YYYYMMDD-NNNN"""
-    prefix_setting = db.query(Setting).filter(Setting.key == "invoice_prefix").first()
-    prefix = prefix_setting.value if prefix_setting else "INV"
+    """Generate a unique invoice number: PREFIX-YYYYMMDD-NNNN using fast index lookup."""
+    prefix_setting = db.query(Setting.value).filter(Setting.key == "invoice_prefix").first()
+    prefix = prefix_setting[0] if prefix_setting else "INV"
 
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-
-    # Count today's sales to generate sequence number
+    today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    count = db.query(func.count(Sale.id)).filter(Sale.created_at >= today_start).scalar() or 0
 
-    return f"{prefix}-{today}-{count + 1:04d}"
+    # Fast indexed lookup: find highest invoice today instead of counting entire table
+    last_sale_today = (
+        db.query(Sale.invoice_no)
+        .filter(Sale.created_at >= today_start)
+        .order_by(Sale.id.desc())
+        .first()
+    )
+
+    next_seq = 1
+    if last_sale_today and last_sale_today[0]:
+        try:
+            # Format is PREFIX-YYYYMMDD-NNNN
+            parts = str(last_sale_today[0]).split("-")
+            if len(parts) >= 3:
+                next_seq = int(parts[-1]) + 1
+        except (ValueError, IndexError):
+            next_seq = 1
+
+    return f"{prefix}-{today_str}-{next_seq:04d}"
 
 
 def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
     """
-    Complete a sale atomically.
-    Raises HTTPException on validation failure.
+    Complete a sale atomically with high-speed batch locking.
     """
     try:
-        # Step 1: Validate all items and gather product data
+        # Step 1: Batch validate all items and lock rows in a SINGLE query
+        item_quantities = {item.product_id: item.quantity for item in bill.items}
+        item_discounts = {item.product_id: item.discount for item in bill.items}
+        product_ids = list(item_quantities.keys())
+
+        if not product_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cart is empty."
+            )
+
+        # Single batch query with row-level locks
+        locked_products = (
+            db.query(Product)
+            .filter(Product.id.in_(product_ids), Product.status == "active")
+            .with_for_update(of=Product)
+            .all()
+        )
+        product_map = {p.id: p for p in locked_products}
+
         cart_products = []
         for item in bill.items:
-            product = db.query(Product).filter(
-                Product.id == item.product_id,
-                Product.status == "active"
-            ).with_for_update(of=Product).first()
-
+            product = product_map.get(item.product_id)
             if not product:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -69,7 +98,7 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
         # Step 2: Generate invoice number
         invoice_no = generate_invoice_number(db)
 
-        # Step 3: Calculate totals and create sale items
+        # Step 3: Calculate totals and prepare sale items
         sale_items = []
         subtotal = 0.0
         total_tax = 0.0
@@ -98,7 +127,6 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
         bill_discount = bill.bill_discount
         total_item_discounts = sum(item.discount for item in bill.items)
         total_discount = total_item_discounts + bill_discount
-
         grand_total = round(subtotal - total_discount + total_tax, 2)
 
         # Step 4: Create sale record
@@ -118,9 +146,10 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
             customer_email=bill.customer_email,
         )
         db.add(sale)
-        db.flush()  # Get sale.id
+        db.flush()  # Assign sale.id
 
-        # Step 5: Add sale items and update stock
+        # Step 5: Add sale items and decrement stock in bulk
+        stock_transactions = []
         for (product, item), sale_item in zip(cart_products, sale_items):
             sale_item.sale_id = sale.id
             db.add(sale_item)
@@ -129,26 +158,32 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
             product.stock_qty -= item.quantity
 
             # Create stock transaction (BR-06)
-            stock_txn = StockTransaction(
-                product_id=product.id,
-                type="SALE",
-                quantity=-item.quantity,
-                reference_id=invoice_no,
-                reason=f"Sale {invoice_no}",
-                user_id=user_id,
+            stock_transactions.append(
+                StockTransaction(
+                    product_id=product.id,
+                    type="SALE",
+                    quantity=-item.quantity,
+                    reference_id=invoice_no,
+                    reason=f"Sale {invoice_no}",
+                    user_id=user_id,
+                )
             )
-            db.add(stock_txn)
+
+        db.add_all(stock_transactions)
 
         # Step 6: Commit atomically
         db.commit()
-        
-        
-        sale_with_rels = db.query(Sale).options(
-            joinedload(Sale.user),
-            joinedload(Sale.items).joinedload(SaleItem.product)
-        ).filter(Sale.id == sale.id).first()
-        
-        return sale_with_rels
+
+        # Invalidate in-memory cache so subsequent product listings reflect new stock
+        try:
+            from app.cache import cache
+            cache.clear()
+        except Exception:
+            pass
+
+        # Return with relationships already loaded in session
+        db.refresh(sale)
+        return sale
 
     except HTTPException:
         db.rollback()

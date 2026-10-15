@@ -22,8 +22,15 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """Get dashboard overview statistics."""
-    return get_dashboard_stats(db)
+    """Get dashboard overview statistics with fast caching."""
+    from app.cache import cache
+    cached = cache.get("reports_dashboard_stats")
+    if cached is not None:
+        return cached
+
+    stats = get_dashboard_stats(db)
+    cache.set("reports_dashboard_stats", stats, ttl=60)  # 1 min cache
+    return stats
 
 
 @router.get("/sales-by-date")
@@ -33,7 +40,13 @@ def sales_by_date(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Get daily sales summary for a date range."""
+    """Get daily sales summary for a date range with caching."""
+    cache_key = f"reports_sales_by_date_{start_date}_{end_date}"
+    from app.cache import cache
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     if not start_date:
         start = datetime.now(timezone.utc) - timedelta(days=30)
     else:
@@ -44,7 +57,9 @@ def sales_by_date(
     else:
         end = datetime.fromisoformat(end_date)
 
-    return get_sales_by_date_range(db, start, end)
+    result = get_sales_by_date_range(db, start, end)
+    cache.set(cache_key, result, ttl=120)  # 2 min cache
+    return result
 
 
 @router.get("/product-sales")

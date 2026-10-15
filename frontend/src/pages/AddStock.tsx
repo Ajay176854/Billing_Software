@@ -43,13 +43,25 @@ export default function AddStock() {
     }
   };
 
-  const handleSearch = async (q: string) => {
+  useEffect(() => {
+    if (search.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/products?search=${encodeURIComponent(search.trim())}`);
+        setResults(res.data);
+      } catch {
+        setResults([]);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleSearch = (q: string) => {
     setSearch(q);
-    if (q.length < 2) { setResults([]); return; }
-    try {
-      const res = await api.get(`/products?search=${q}`);
-      setResults(res.data);
-    } catch { }
   };
 
   const handleCreateCategory = async () => {
