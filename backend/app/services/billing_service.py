@@ -181,9 +181,25 @@ def complete_sale(db: Session, bill: BillRequest, user_id: int) -> Sale:
         except Exception:
             pass
 
-        # Return with relationships already loaded in session
-        db.refresh(sale)
-        return sale
+        # Return sale and formatted items directly from memory
+        from app.schemas.sale import SaleItemResponse
+        sale_items_data = [
+            SaleItemResponse(
+                id=s_item.id or 0,
+                product_id=prod.id,
+                product_name=prod.name,
+                product_barcode=prod.barcode,
+                quantity=it.quantity,
+                unit_price=prod.selling_price,
+                discount=it.discount,
+                tax_rate=prod.tax_rate,
+                tax=round((prod.selling_price * it.quantity - it.discount) * (prod.tax_rate / 100), 2),
+                subtotal=round((prod.selling_price * it.quantity - it.discount) + round((prod.selling_price * it.quantity - it.discount) * (prod.tax_rate / 100), 2), 2),
+            )
+            for (prod, it), s_item in zip(cart_products, sale_items)
+        ]
+
+        return sale, sale_items_data
 
     except HTTPException:
         db.rollback()

@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
@@ -34,6 +36,16 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = false, setIsOpen }: SidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
+  const [storeName, setStoreName] = useState(() => localStorage.getItem('store_name') || 'Moira Luxe');
+
+  useEffect(() => {
+    api.get('/settings/store-profile').then(res => {
+      if (res.data?.store_name) {
+        setStoreName(res.data.store_name);
+        localStorage.setItem('store_name', res.data.store_name);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -59,10 +71,10 @@ export default function Sidebar({ isOpen = false, setIsOpen }: SidebarProps) {
         <div className="flex items-center justify-between border-b border-border px-5 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 overflow-hidden items-center justify-center rounded-lg shadow-md">
-              <img src="/logo.jpg" alt="Moira Luxe Logo" className="h-full w-full object-cover" />
+              <img src="/logo.jpg" alt="Store Logo" className="h-full w-full object-cover" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-text-primary">Moira Luxe</h1>
+              <h1 className="text-sm font-bold text-text-primary capitalize">{storeName}</h1>
               <p className="text-xs text-text-muted">Billing & Inventory</p>
             </div>
           </div>

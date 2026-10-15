@@ -47,14 +47,16 @@ def list_printers():
 
 
 @router.post("/print-label")
-def direct_print_label(payload: DirectLabelRequest):
+def direct_print_label(payload: DirectLabelRequest, db: Session = Depends(get_db)):
     """Send TSPL label command directly to DEV 632-L58P / Xprinter without browser popup."""
     try:
+        store = get_store_settings(db)
+        effective_store_name = payload.store_name or store.get("store_name", "MOIRA LUXE")
         raw_bytes = build_tspl_label(
             product_name=payload.product_name,
             barcode=payload.barcode,
             price=payload.price,
-            store_name=payload.store_name or "MOIRA LUXE",
+            store_name=effective_store_name,
             copies=payload.copies or 1,
             width_mm=payload.width_mm or 50,
             height_mm=payload.height_mm or 30,

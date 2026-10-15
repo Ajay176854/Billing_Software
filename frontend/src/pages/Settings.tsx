@@ -7,7 +7,6 @@ import { ConfirmModal } from '../components/ConfirmModal';
 
 export default function SettingsPage() {
   const [form, setForm] = useState({ store_name: '', store_address: '', store_phone: '', store_email: '', store_gst: '', invoice_prefix: 'INV', currency_symbol: '' });
-  const [backups, setBackups] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
 
@@ -25,14 +24,10 @@ export default function SettingsPage() {
     const fetchSettings = async () => {
       try { const res = await api.get('/settings/store-profile'); setForm(res.data); } catch {}
     };
-    const fetchBackups = async () => {
-      try { const res = await api.get('/backup/list'); setBackups(res.data.backups || []); } catch {}
-    };
     const fetchCategories = async () => {
       try { const res = await api.get('/categories'); setCategories(res.data); } catch {}
     };
     fetchSettings();
-    fetchBackups();
     fetchCategories();
   }, []);
 
@@ -77,14 +72,25 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const createBackup = async () => {
+  const handleExportData = async () => {
     setBackingUp(true);
     try {
-      const res = await api.post('/backup/create');
-      toast.success(`Backup created: ${res.data.filename}`);
-      const bkRes = await api.get('/backup/list');
-      setBackups(bkRes.data.backups || []);
-    } catch (err: any) { toast.error('Backup failed'); }
+      const res = await api.get('/backup/export', { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `moira_luxe_store_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Store data exported and saved to your laptop!');
+    } catch (err: any) {
+      toast.error('Failed to export data');
+      console.error(err);
+    }
     setBackingUp(false);
   };
 
@@ -287,31 +293,26 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Backup */}
+      {/* Export Store Data */}
       <div className="rounded-xl border border-border bg-bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-text-primary">Database Backup</h3>
-          <button onClick={createBackup} disabled={backingUp} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:border-accent hover:text-accent disabled:opacity-50">
-            <Database className="h-4 w-4" /> {backingUp ? 'Creating...' : 'Create Backup'}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Database className="h-4 w-4 text-accent" /> Export Store Data (Backup)
+            </h3>
+            <p className="mt-1 text-xs text-text-muted">
+              Download all your Products, Invoices, Customers, and Settings directly from Supabase to your laptop as a JSON backup file.
+            </p>
+          </div>
+          <button 
+            type="button"
+            onClick={handleExportData} 
+            disabled={backingUp} 
+            className="flex items-center justify-center gap-2 rounded-lg bg-accent/10 border border-accent/30 text-accent px-4 py-2 text-sm font-medium hover:bg-accent hover:text-white transition-all disabled:opacity-50 shrink-0"
+          >
+            <Download className="h-4 w-4" /> {backingUp ? 'Exporting...' : 'Export to Laptop'}
           </button>
         </div>
-        {backups.length > 0 ? (
-          <div className="space-y-2">
-            {backups.map((b: any) => (
-              <div key={b.filename} className="flex items-center justify-between rounded-lg bg-bg-hover/50 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-text-primary">{b.filename}</p>
-                  <p className="text-xs text-text-muted">{b.size_mb} MB &bull; {b.created ? new Date(b.created).toLocaleString('en-IN') : ''}</p>
-                </div>
-                <a href={`/api/backup/download/${b.filename}`} className="flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-medium text-accent hover:bg-accent/10">
-                  <Download className="h-3.5 w-3.5" /> Download
-                </a>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-text-muted">No backups yet. Create your first backup above.</p>
-        )}
       </div>
 
       {/* Categories Management */}

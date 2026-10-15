@@ -14,10 +14,11 @@ if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 else:
     engine_kwargs.update({
-        "pool_size": 20,
-        "max_overflow": 10,
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,
+        "pool_size": 10,
+        "max_overflow": 5,
+        "pool_pre_ping": False,  # Disabled to eliminate 2.5s handshake delay over cloud connection
+        "pool_recycle": 3600,
+        "pool_use_lifo": True,   # Reuses the most recently used connection (hot connection)
     })
 
 db_url = settings.DATABASE_URL

@@ -254,7 +254,7 @@ export default function POS() {
 
   const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
 
-  // Complete sale
+  // Complete sale with instant optimistic receipt print
   const completeSale = async () => {
     if (cart.length === 0) return;
 
@@ -263,46 +263,70 @@ export default function POS() {
       return;
     }
 
+    const currentCart = [...cart];
+    const currentTotal = grandTotal;
+    const currentSubtotal = subtotal;
+    const currentDiscount = totalDiscount;
+
+    // 1. OPTIMISTIC RECEIPT PRINT: Start printing immediately without waiting for server response
+    const optimisticInvoiceNo = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-PENDING`;
+    const receiptPayload = {
+      invoice_no: optimisticInvoiceNo,
+      items: currentCart.map((i) => ({
+        name: i.name || "Item",
+        quantity: i.quantity,
+        price: i.price * i.quantity - i.discount,
+      })),
+      subtotal: currentSubtotal,
+      discount: currentDiscount,
+      total: currentTotal,
+    };
+
+    // Fire hardware print to local spooler right now
+    directPrintReceipt(0, receiptPayload);
+
+    // 2. Clear cart and reset UI immediately so cashier can scan next customer
+    for (const item of currentCart) {
+      const prod = catalogRef.current.idMap.get(item.product_id);
+      if (prod) {
+        prod.stock_qty = Math.max(0, prod.stock_qty - item.quantity);
+      }
+    }
+    const emptyCart: CartItem[] = [];
+    setCart(emptyCart);
+    saveCart(emptyCart);
+    setBillDiscount(0);
+    setShowPayment(false);
+    const savedCustomerName = customerName;
+    const savedCustomerPhone = customerPhone;
+    const savedCustomerPlace = customerPlace;
+    const savedCustomerEmail = customerEmail;
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerPlace('');
+    setCustomerEmail('');
+    setTimeout(() => barcodeRef.current?.focus(), 100);
+
     setProcessing(true);
     try {
+      // 3. Sync to Supabase in background
       const res = await api.post('/billing/complete', {
-        items: cart.map((i) => ({ product_id: i.product_id, quantity: i.quantity, discount: i.discount })),
+        items: currentCart.map((i) => ({ product_id: i.product_id, quantity: i.quantity, discount: i.discount })),
         payment_method: paymentMethod,
         bill_discount: billDiscount,
-        customer_name: customerName || undefined,
-        customer_phone: customerPhone || undefined,
-        customer_place: customerPlace || undefined,
-        customer_email: customerEmail || undefined,
+        customer_name: savedCustomerName || undefined,
+        customer_phone: savedCustomerPhone || undefined,
+        customer_place: savedCustomerPlace || undefined,
+        customer_email: savedCustomerEmail || undefined,
       });
+
       setCompletedSale({ id: res.data.id, invoice_no: res.data.invoice_no, total: res.data.total, payment_method: res.data.payment_method });
-      // Update in-memory stock immediately for purchased items
-      for (const item of cart) {
-        const prod = catalogRef.current.idMap.get(item.product_id);
-        if (prod) {
-          prod.stock_qty = Math.max(0, prod.stock_qty - item.quantity);
-        }
-      }
-
-      const emptyCart: CartItem[] = [];
-      setCart(emptyCart);
-      saveCart(emptyCart);
-      setBillDiscount(0);
-      setShowPayment(false);
-      setCustomerName('');
-      setCustomerPhone('');
-      setCustomerPlace('');
-      setCustomerEmail('');
       toast.success(`Sale completed! Invoice: ${res.data.invoice_no}`);
-
-      // Instantly print receipt to thermal printer like barcode label printer
-      directPrintReceipt(res.data.id, res.data);
-
-      // Focus back to barcode scanner immediately
-      setTimeout(() => {
-        barcodeRef.current?.focus();
-      }, 300);
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Sale failed');
+      toast.error(err.response?.data?.detail || 'Sale sync failed! Please check connection.');
+      // Restore cart if server rejected the transaction (e.g. out of stock)
+      setCart(currentCart);
+      saveCart(currentCart);
     } finally {
       setProcessing(false);
     }
@@ -712,7 +736,7 @@ export default function POS() {
                 onClick={() => { setCompletedSale(null); barcodeRef.current?.focus(); }}
                 className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex-1 rounded-lg py-2.5 text-sm font-semibold text-white"
               >
-                New Bill (Ready to Scan)
+                New Bill
               </button>
             </div>
           </div>

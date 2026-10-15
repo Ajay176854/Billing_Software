@@ -31,12 +31,22 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   const [showQr, setShowQr] = useState(false);
   const [showStoreHeader, setShowStoreHeader] = useState(true);
   const [copies, setCopies] = useState(1);
-  const storeName = 'MOIRA LUXE';
+  const [storeName, setStoreName] = useState(() => {
+    return localStorage.getItem('store_name') || 'MOIRA LUXE';
+  });
   const [printingDirect, setPrintingDirect] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('hardware_label_size') as LabelLayout;
     if (saved) setLabelSize(saved);
+
+    // Fetch dynamic store name from settings
+    api.get('/settings/store-profile').then(res => {
+      if (res.data?.store_name) {
+        setStoreName(res.data.store_name);
+        localStorage.setItem('store_name', res.data.store_name);
+      }
+    }).catch(() => {});
   }, []);
 
   if (!isOpen) return null;
@@ -45,11 +55,11 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   const handleDirectPrint = async () => {
     setPrintingDirect(true);
     try {
-      const dimensions = labelSize === '50x25' 
-        ? { width: 50, height: 25 } 
-        : labelSize === '40x30' 
-        ? { width: 40, height: 30 } 
-        : { width: 50, height: 30 };
+      const dimensions = labelSize === '50x25'
+        ? { width: 50, height: 25 }
+        : labelSize === '40x30'
+          ? { width: 40, height: 30 }
+          : { width: 50, height: 30 };
 
       // Send directly to local FastAPI server on port 8000
       let res;
@@ -190,7 +200,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           {/* Label Preview Card */}
           <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Live Thermal Label Preview</span>
-            
+
             <div
               ref={printRef}
               style={{
@@ -208,14 +218,14 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 ) : (
                   <div></div>
                 )}
-                
+
                 {showPrice && price !== undefined && (
                   <div className="price-tag text-[11px] font-bold text-black tracking-tight whitespace-nowrap ml-auto">
                     {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </div>
                 )}
               </div>
-              
+
               {/* Product name slightly smaller */}
               <div className="product-name text-[13px] font-bold text-black leading-tight line-clamp-2 px-1 text-center w-full my-0.5">
                 {productName}
@@ -235,9 +245,9 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 {productCode ? (
                   <Barcode
                     value={productCode}
-                    height={labelSize === '50x25' ? 36 : 48}
-                    width={1.6}
-                    fontSize={12}
+                    height={labelSize === '50x25' ? 38 : 48}
+                    width={2.2}
+                    fontSize={13}
                     margin={0}
                     displayValue={true}
                     background="#ffffff"
@@ -335,7 +345,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50"
               >
                 <Zap className="w-4 h-4 fill-current" />
-                {printingDirect ? 'Printing...' : `Direct Print (${copies})`}
+                {printingDirect ? 'Printing...' : `Direct (${copies})`}
               </button>
             </div>
           </div>

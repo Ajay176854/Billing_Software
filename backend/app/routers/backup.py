@@ -1,65 +1,115 @@
 """
-Backup router — database backup and restore (Admin only).
+Backup router — database export and download (Admin only).
+Supports exporting all products, sales, and settings directly from Supabase to local laptop.
 """
-import shutil
-from pathlib import Path
 from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session, joinedload
 
+from app.database import get_db
 from app.auth import require_role
-from app.config import settings
+from app.models.product import Product
+from app.models.sale import Sale
+from app.models.sale_item import SaleItem
+from app.models.category import Category
+from app.models.setting import Setting
 
 router = APIRouter(prefix="/backup", tags=["Backup"])
 
-# Derive DB file path from the SQLite URL
-DB_PATH = Path(settings.DATABASE_URL.replace("sqlite:///", ""))
-BACKUP_DIR = DB_PATH.parent / "backups"
 
+@router.get("/export")
+def export_store_data(db: Session = Depends(get_db), current_user=Depends(require_role("admin"))):
+    """
+    Export all store data (products, categories, sales, settings)
+    directly from Supabase to download as a JSON file on local laptop.
+    """
+    try:
+        # 1. Fetch categories
+        categories = db.query(Category).all()
+        categories_data = [
+            {"id": c.id, "name": c.name, "prefix": c.prefix, "status": c.status}
+            for c in categories
+        ]
 
-@router.post("/create")
-def create_backup(current_user=Depends(require_role("admin"))):
-    """Create a backup of the SQLite database."""
-    if not DB_PATH.exists():
-        raise HTTPException(status_code=404, detail="Database file not found")
+        # 2. Fetch products
+        products = db.query(Product).all()
+        products_data = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "barcode": p.barcode,
+                "sku": p.sku,
+                "category_id": p.category_id,
+                "purchase_price": p.purchase_price,
+                "selling_price": p.selling_price,
+                "tax_rate": p.tax_rate,
+                "stock_qty": p.stock_qty,
+                "unit": p.unit,
+                "status": p.status,
+            }
+            for p in products
+        ]
 
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"billing_backup_{timestamp}.db"
-    backup_path = BACKUP_DIR / backup_filename
+        # 3. Fetch sales with items
+        sales = db.query(Sale).options(joinedload(Sale.items)).order_by(Sale.id.desc()).all()
+        sales_data = [
+            {
+                "id": s.id,
+                "invoice_no": s.invoice_no,
+                "subtotal": s.subtotal,
+                "discount": s.discount,
+                "tax": s.tax,
+                "total": s.total,
+                "payment_method": s.payment_method,
+                "status": s.status,
+                "customer_name": s.customer_name,
+                "customer_phone": s.customer_phone,
+                "customer_place": s.customer_place,
+                "customer_email": s.customer_email,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "items": [
+                    {
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "unit_price": item.unit_price,
+                        "discount": item.discount,
+                        "tax": item.tax,
+                        "subtotal": item.subtotal,
+                    }
+                    for item in s.items
+                ],
+            }
+            for s in sales
+        ]
 
-    shutil.copy2(str(DB_PATH), str(backup_path))
+        # 4. Settings
+        settings_rows = db.query(Setting).all()
+        settings_data = {s.key: s.value for s in settings_rows}
 
-    return {
-        "message": "Backup created successfully",
-        "filename": backup_filename,
-        "path": str(backup_path),
-        "size_mb": round(backup_path.stat().st_size / (1024 * 1024), 2),
-    }
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        export_payload = {
+            "store": settings_data.get("store_name", "MOIRA LUXE"),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "total_products": len(products_data),
+            "total_sales": len(sales_data),
+            "categories": categories_data,
+            "products": products_data,
+            "sales": sales_data,
+            "settings": settings_data,
+        }
+
+        filename = f"moira_luxe_store_backup_{timestamp}.json"
+        return JSONResponse(
+            content=export_payload,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
 
 @router.get("/list")
 def list_backups(current_user=Depends(require_role("admin"))):
-    """List available backups."""
-    if not BACKUP_DIR.exists():
-        return {"backups": []}
+    """Compatibility endpoint."""
+    return {"backups": []}
 
-    backups = []
-    for f in sorted(BACKUP_DIR.glob("*.db"), reverse=True):
-        backups.append({
-            "filename": f.name,
-            "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
-            "created": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(),
-        })
-
-    return {"backups": backups}
-
-
-@router.get("/download/{filename}")
-def download_backup(filename: str, current_user=Depends(require_role("admin"))):
-    """Download a backup file."""
-    backup_path = BACKUP_DIR / filename
-    if not backup_path.exists():
-        raise HTTPException(status_code=404, detail="Backup not found")
-    return FileResponse(str(backup_path), filename=filename)

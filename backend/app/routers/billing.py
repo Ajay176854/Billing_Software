@@ -21,13 +21,13 @@ def complete_bill(
     current_user=Depends(get_current_user),
 ):
     """Complete a sale — atomic transaction per TRD §13."""
-    sale = complete_sale(db, bill, current_user.id)
+    sale, sale_items_data = complete_sale(db, bill, current_user.id)
 
     return SaleResponse(
         id=sale.id,
         invoice_no=sale.invoice_no,
         user_id=sale.user_id,
-        user_name=sale.user.name if sale.user else None,
+        user_name=current_user.name if current_user else None,
         subtotal=sale.subtotal,
         discount=sale.discount,
         tax=sale.tax,
@@ -39,21 +39,7 @@ def complete_bill(
         customer_phone=sale.customer_phone,
         customer_place=sale.customer_place,
         customer_email=sale.customer_email,
-        items=[
-            SaleItemResponse(
-                id=item.id,
-                product_id=item.product_id,
-                product_name=item.product.name if item.product else None,
-                product_barcode=item.product.barcode if item.product else None,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                discount=item.discount,
-                tax_rate=item.tax_rate,
-                tax=item.tax,
-                subtotal=item.subtotal,
-            )
-            for item in sale.items
-        ],
+        items=sale_items_data,
         created_at=sale.created_at,
     )
 

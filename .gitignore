@@ -17,3 +17,5 @@ dist/
 *.spec
 .vscode/
 backend/test_*.py
+*backup*.json
+*.exe
