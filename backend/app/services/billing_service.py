@@ -24,10 +24,12 @@ from app.models.setting import Setting
 from app.schemas.sale import BillRequest
 
 
+_cached_invoice_prefix: str = "INV"
+
 def generate_invoice_number(db: Session) -> str:
     """Generate a unique invoice number: PREFIX-YYYYMMDD-NNNN using fast index lookup."""
-    prefix_setting = db.query(Setting.value).filter(Setting.key == "invoice_prefix").first()
-    prefix = prefix_setting[0] if prefix_setting else "INV"
+    global _cached_invoice_prefix
+    prefix = _cached_invoice_prefix
 
     today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)

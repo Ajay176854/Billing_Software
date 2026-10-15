@@ -35,7 +35,7 @@ engine = create_engine(
     **engine_kwargs
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):

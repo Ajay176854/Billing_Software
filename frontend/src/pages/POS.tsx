@@ -297,6 +297,14 @@ export default function POS() {
     saveCart(emptyCart);
     setBillDiscount(0);
     setShowPayment(false);
+    // Instant Completed Sale dialog with zero UI wait time
+    setCompletedSale({
+      id: 0,
+      invoice_no: 'Saving bill...',
+      total: currentTotal,
+      payment_method: paymentMethod,
+    });
+
     const savedCustomerName = customerName;
     const savedCustomerPhone = customerPhone;
     const savedCustomerPlace = customerPlace;
@@ -320,8 +328,18 @@ export default function POS() {
         customer_email: savedCustomerEmail || undefined,
       });
 
-      setCompletedSale({ id: res.data.id, invoice_no: res.data.invoice_no, total: res.data.total, payment_method: res.data.payment_method });
-      toast.success(`Sale completed! Invoice: ${res.data.invoice_no}`);
+      // Update dialog with official invoice number and ID
+      setCompletedSale((prev) => prev ? {
+        ...prev,
+        id: res.data.id,
+        invoice_no: res.data.invoice_no,
+      } : {
+        id: res.data.id,
+        invoice_no: res.data.invoice_no,
+        total: res.data.total,
+        payment_method: res.data.payment_method,
+      });
+      toast.success(`Bill generated: ${res.data.invoice_no}`);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Sale sync failed! Please check connection.');
       // Restore cart if server rejected the transaction (e.g. out of stock)
