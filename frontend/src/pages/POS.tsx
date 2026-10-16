@@ -372,13 +372,13 @@ export default function POS() {
     } : undefined;
 
     try {
-      // 1. Direct hardware print to local Windows spooler
-      await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`, payload);
+      // 1. Direct hardware print via current API endpoint
+      await api.post(`/printer/print-receipt/${saleId}`, payload);
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
-        // 2. Direct print via API
-        await api.post(`/printer/print-receipt/${saleId}`, payload);
+        // 2. Fallback to explicit localhost:8000
+        await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`, payload);
         toast.success("Printed receipt directly to thermal printer!");
       } catch (err: any) {
         // 3. Fallback: print inside the current app window using hidden iframe (stays inside software)

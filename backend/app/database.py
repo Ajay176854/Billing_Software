@@ -13,6 +13,7 @@ engine_kwargs = {
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 else:
+    connect_args["timeout"] = 10  # 10s socket timeout so startup never hangs indefinitely on poor/missing network
     engine_kwargs.update({
         "pool_size": 10,
         "max_overflow": 5,

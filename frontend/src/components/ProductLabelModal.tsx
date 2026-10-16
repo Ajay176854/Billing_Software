@@ -61,10 +61,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           ? { width: 40, height: 30 }
           : { width: 50, height: 30 };
 
-      // Send directly to local FastAPI server on port 8000
+      // Send directly to local FastAPI server via configured api client
       let res;
       try {
-        res = await axios.post('http://127.0.0.1:8000/api/printer/print-label', {
+        res = await api.post('/printer/print-label', {
           product_name: productName,
           barcode: productCode,
           price: showPrice ? price : undefined,
@@ -76,7 +76,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           show_header: showStoreHeader,
         });
       } catch {
-        res = await api.post('/printer/print-label', {
+        res = await axios.post('http://127.0.0.1:8000/api/printer/print-label', {
           product_name: productName,
           barcode: productCode,
           price: showPrice ? price : undefined,

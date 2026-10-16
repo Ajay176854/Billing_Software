@@ -12,3 +12,6 @@ psycopg2-binary
 slowapi
 pg8000
 redis
+pywebview
+pywin32
+pyinstaller

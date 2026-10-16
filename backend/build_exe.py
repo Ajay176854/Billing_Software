@@ -41,6 +41,7 @@ def build_executable():
         "--hidden-import", "win32api",
         "--hidden-import", "win32ui",
         "--hidden-import", "win32con",
+        "--hidden-import", "win32gui",
         "--hidden-import", "uvicorn.logging",
         "--hidden-import", "uvicorn.loops",
         "--hidden-import", "uvicorn.loops.auto",

@@ -278,7 +278,11 @@ export default function SettingsPage() {
                 onClick={async () => {
                   try {
                     const width = (form as any).receipt_width || '80mm';
-                    await axios.post(`http://127.0.0.1:8000/api/printer/test-receipt?paper_width=${width}`);
+                    try {
+                      await api.post(`/printer/test-receipt?paper_width=${width}`);
+                    } catch {
+                      await axios.post(`http://127.0.0.1:8000/api/printer/test-receipt?paper_width=${width}`);
+                    }
                     toast.success(`Sent ${width} test receipt directly to printer!`);
                   } catch (err: any) {
                     toast.error(`Direct print failed: ${err?.response?.data?.detail || err.message}`);
