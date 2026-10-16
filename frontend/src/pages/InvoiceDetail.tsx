@@ -54,6 +54,7 @@ export default function InvoiceDetail() {
       subtotal: sale.subtotal,
       discount: sale.discount,
       total: sale.total,
+      payment_method: sale.payment_method,
     };
 
     try {

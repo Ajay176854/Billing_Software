@@ -145,15 +145,15 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
-          padding: 1mm 1.5mm;
+          justify-content: flex-start;
+          padding: 5.5mm 2mm 1.5mm 2mm;
           page-break-after: always;
         }
-        .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 2px; }
-        .store-header { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; text-align: left; }
-        .price-tag { font-size: 11px; font-weight: 700; white-space: nowrap; margin-left: 4px; text-align: right; }
-        .product-name { font-weight: 700; font-size: 13px; margin: 2px 0 3px 0; max-height: 34px; overflow: hidden; line-height: 1.15; word-break: break-word; text-align: center; width: 100%; }
-        .barcode-wrap { margin-top: 2px; display: flex; justify-content: center; width: 100%; }
+        .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 4px; padding-bottom: 2px; }
+        .store-header { font-size: 13.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; width: 100%; margin-top: 2px; margin-bottom: 4px; }
+        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; margin-left: 6px; text-align: right; }
+        .product-name { font-weight: 700; font-size: 13px; margin: 4px 0 4px 0; max-height: 34px; overflow: hidden; line-height: 1.15; word-break: break-word; text-align: center; width: 100%; }
+        .barcode-wrap { margin-top: 4px; display: flex; justify-content: center; width: 100%; }
         svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
         @media print {
           @page { 
@@ -161,7 +161,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             size: ${labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
           }
           body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .label-page { border: none !important; width: 100%; height: 100%; padding: 1mm; }
+          .label-page { border: none !important; width: 100%; height: 100%; padding: 5.5mm 1.5mm 1.5mm 1.5mm !important; }
         }
       `);
       iframeDoc.write('</style></head><body>');
@@ -207,28 +207,26 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 width: labelSize === '40x30' ? '180px' : '210px',
                 minHeight: labelSize === '50x25' ? '110px' : '135px',
               }}
-              className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-2.5 flex flex-col items-center justify-center text-center shadow-xs"
+              className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-6 px-3 pb-2.5 flex flex-col items-center justify-center text-center shadow-xs"
             >
-              {/* Top row: Shop name on left/center & Price on top right */}
-              <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-0.5 mb-1.5">
-                {showStoreHeader ? (
-                  <div className="store-header text-[11px] font-bold tracking-wider text-black">
-                    {storeName}
-                  </div>
-                ) : (
-                  <div></div>
-                )}
+              {/* Store Header centered in the middle */}
+              {showStoreHeader && (
+                <div className="store-header text-[14px] font-extrabold tracking-wider text-black text-center w-full mt-1 mb-1.5">
+                  {storeName}
+                </div>
+              )}
+
+              {/* Second row: Product Name & Price */}
+              <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-1 mb-1.5 px-0.5">
+                <span className="product-name text-[12px] font-bold text-black text-left truncate max-w-[130px]">
+                  {productName}
+                </span>
 
                 {showPrice && price !== undefined && (
-                  <div className="price-tag text-[11px] font-bold text-black tracking-tight whitespace-nowrap ml-auto">
+                  <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
                     {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                  </div>
+                  </span>
                 )}
-              </div>
-
-              {/* Product name slightly smaller */}
-              <div className="product-name text-[13px] font-bold text-black leading-tight line-clamp-2 px-1 text-center w-full my-0.5">
-                {productName}
               </div>
 
               {showQr && (

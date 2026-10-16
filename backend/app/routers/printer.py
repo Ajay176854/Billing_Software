@@ -63,7 +63,13 @@ def direct_print_label(payload: DirectLabelRequest, db: Session = Depends(get_db
             show_price=payload.show_price if payload.show_price is not None else True,
             show_header=payload.show_header if payload.show_header is not None else True,
         )
-        send_raw_to_printer(raw_bytes, payload.printer_name)
+        target_printer = payload.printer_name
+        if not target_printer:
+            all_printers = get_available_printers()
+            label_printers = [p for p in all_printers if "label" in p.lower()]
+            if label_printers:
+                target_printer = label_printers[0]
+        send_raw_to_printer(raw_bytes, target_printer)
         return {"status": "ok", "message": f"Sent {payload.copies} label(s) directly to printer"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Direct print failed: {str(e)}")
@@ -75,11 +81,12 @@ class DirectReceiptPayload(BaseModel):
     subtotal: Optional[float] = None
     discount: Optional[float] = 0.0
     total: Optional[float] = None
+    payment_method: Optional[str] = "CASH"
     store_name: Optional[str] = None
     store_address: Optional[str] = None
     store_phone: Optional[str] = None
     currency_symbol: Optional[str] = "Rs."
-    paper_width: Optional[str] = "80mm"
+    paper_width: Optional[str] = "58mm"
 
 
 @router.post("/print-receipt/{sale_id}")
@@ -91,6 +98,7 @@ def direct_print_receipt(
     """Send ESC/POS receipt commands directly to 58mm/80mm printer without browser popup."""
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     store = get_store_settings(db)
+    payment_method = "CASH"
     
     if sale:
         invoice_no = sale.invoice_no
@@ -105,12 +113,14 @@ def direct_print_receipt(
         subtotal = sale.subtotal
         discount = sale.discount
         total = sale.total
+        payment_method = sale.payment_method or "CASH"
     elif payload and payload.invoice_no:
         invoice_no = payload.invoice_no
         items_data = payload.items or []
         subtotal = payload.subtotal or 0.0
         discount = payload.discount or 0.0
         total = payload.total or 0.0
+        payment_method = payload.payment_method or "CASH"
     else:
         raise HTTPException(status_code=404, detail="Sale not found")
 
@@ -135,6 +145,7 @@ def direct_print_receipt(
             currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
             paper_width=(payload and payload.paper_width) or store.get("receipt_width", "58mm"),
             created_at=created_at_str,
+            payment_method=payment_method,
         )
         return {"status": "ok", "message": f"Printed receipt for {invoice_no}"}
     except Exception as e:

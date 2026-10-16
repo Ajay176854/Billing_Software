@@ -263,6 +263,12 @@ export default function POS() {
       return;
     }
 
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+      toast.error("Phone Number must be exactly 10 digits.");
+      return;
+    }
+
     const currentCart = [...cart];
     const currentTotal = grandTotal;
     const currentSubtotal = subtotal;
@@ -280,6 +286,7 @@ export default function POS() {
       subtotal: currentSubtotal,
       discount: currentDiscount,
       total: currentTotal,
+      payment_method: paymentMethod,
     };
 
     // Fire hardware print to local spooler right now
@@ -361,6 +368,7 @@ export default function POS() {
       subtotal: saleData.subtotal || saleData.total,
       discount: saleData.discount || 0,
       total: saleData.total,
+      payment_method: saleData.payment_method || paymentMethod,
     } : undefined;
 
     try {
@@ -601,11 +609,17 @@ export default function POS() {
                 />
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={customerPhone}
-                  onChange={(e) => { setCustomerPhone(e.target.value); setShowSuggestions(true); }}
+                  onChange={(e) => {
+                    const onlyNums = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setCustomerPhone(onlyNums);
+                    setShowSuggestions(true);
+                  }}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  placeholder="Phone Number"
+                  placeholder="Phone Number (10 digits)"
                   className="rounded-lg border border-border bg-bg-card px-3 py-2 text-sm text-text-primary outline-none placeholder-text-muted focus:border-accent"
                 />
                 <input
@@ -633,7 +647,7 @@ export default function POS() {
                       onMouseDown={(e) => {
                         e.preventDefault(); // Prevent focus loss on input
                         setCustomerName(c.name || '');
-                        setCustomerPhone(c.phone || '');
+                        setCustomerPhone((c.phone || '').replace(/\D/g, '').slice(0, 10));
                         setCustomerPlace(c.place || '');
                         setCustomerEmail(c.email || '');
                         setShowSuggestions(false);

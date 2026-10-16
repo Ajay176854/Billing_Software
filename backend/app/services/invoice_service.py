@@ -35,9 +35,9 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
     receipt_width = store.get("receipt_width", "58mm")
     is_58mm = "58" in str(receipt_width)
 
-    max_width_px = "200px" if is_58mm else "290px"
+    max_width_px = "216px" if is_58mm else "290px"
     font_size = "10.5px" if is_58mm else "12px"
-    store_font_size = "14px" if is_58mm else "17px"
+    store_font_size = "17px" if is_58mm else "20px"
     barcode_width = 1.0 if is_58mm else 1.3
     barcode_height = 28 if is_58mm else 36
 
@@ -76,7 +76,7 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
             body {{ 
                 max-width:{max_width_px}; 
                 margin:0 auto; 
-                padding:4px 8px; 
+                padding:6px 6px; 
                 font-size:{font_size}; 
             }}
             .receipt-content {{
@@ -84,24 +84,25 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }}
-            .header {{ text-align:center; margin-bottom:6px; padding-bottom:4px; border-bottom:1px dashed #000; }}
-            .store-name {{ font-size:{store_font_size}; font-weight:700; text-transform:uppercase; word-break:break-word; }}
-            .store-info {{ font-size:10px; margin-top:2px; line-height:1.2; }}
-            .invoice-meta {{ margin-bottom:6px; font-size:10px; padding-bottom:4px; border-bottom:1px dashed #000; }}
-            .invoice-meta div {{ margin-bottom:2px; }}
-            table {{ width:100%; border-collapse:collapse; margin-bottom:6px; font-size:{font_size}; table-layout:fixed; page-break-inside: avoid !important; }}
-            th {{ border-bottom:1px dashed #000; padding:2px; text-align:left; font-weight:700; font-size:10px; text-transform:uppercase; }}
-            th.th-item {{ width:48%; }}
-            th.th-disc {{ width:20%; text-align:center; }}
-            th.th-amount {{ width:32%; text-align:right; }}
-            td {{ padding:1px 2px; overflow:hidden; }}
-            .item-name {{ font-weight:700; padding-top:2px; word-break:break-word; }}
+            .header {{ text-align:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px dashed #000; }}
+            .store-name {{ text-align:center; font-size:{store_font_size}; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; word-break:break-word; }}
+            .store-info {{ text-align:center; font-size:10.5px; margin-top:4px; line-height:1.3; }}
+            .invoice-meta {{ margin-bottom:10px; font-size:10.5px; padding-bottom:8px; line-height:1.4; border-bottom:1px dashed #000; }}
+            .invoice-meta div {{ margin-bottom:3px; }}
+            table {{ width:100%; border-collapse:collapse; margin-bottom:10px; font-size:{font_size}; table-layout:fixed; page-break-inside: avoid !important; }}
+            th {{ border-bottom:1px dashed #000; padding:4px 2px; text-align:left; font-weight:700; font-size:10px; text-transform:uppercase; }}
+            th.th-item {{ width:46%; }}
+            th.th-disc {{ width:16%; text-align:center; }}
+            th.th-amount {{ width:38%; text-align:right; }}
+            td {{ padding:2.5px 1px; }}
+            .item-name {{ font-weight:700; padding-top:4px; word-break:break-word; }}
             .item-details {{ font-size:10px; color:#111; }}
-            .item-total {{ text-align:right; font-weight:700; }}
-            .totals {{ width:100%; font-size:{font_size}; border-top:1px dashed #000; padding-top:3px; }}
-            .totals tr td {{ padding:1px 2px; }}
-            .totals .grand-total {{ font-size:13px; font-weight:700; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:4px 2px; }}
-            .footer {{ text-align:center; margin-top:6px; padding-top:4px; font-size:10px; page-break-inside: avoid !important; }}
+            .item-total {{ text-align:right; font-weight:700; white-space:nowrap; }}
+            .totals {{ width:100%; font-size:{font_size}; border-top:1px dashed #000; padding-top:8px; margin-bottom:10px; }}
+            .totals tr td {{ padding:2.5px 1px; }}
+            .totals tr td:last-child {{ white-space:nowrap; }}
+            .totals .grand-total {{ font-size:14px; font-weight:800; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 1px; }}
+            .footer {{ text-align:center; margin-top:12px; padding-top:8px; font-size:10px; line-height:1.35; page-break-inside: avoid !important; }}
             .barcode-container {{ text-align:center; margin-top:6px; display:flex; justify-content:center; page-break-inside: avoid !important; }}
             .barcode-container svg {{ shape-rendering: crispEdges; max-width: 90%; height: auto; }}
             @media print {{
@@ -134,9 +135,8 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
             <div class="header">
                 <div class="store-name">{store['store_name']}</div>
                 <div class="store-info">
-                    {store['store_address']}<br>
-                    {f"Ph: {store['store_phone']}" if store['store_phone'] else ""}
-                    {f" | {store['store_email']}" if store['store_email'] else ""}
+                    {f"{store['store_address']} - {store['store_phone']}".strip(" -") if (store['store_address'] or store['store_phone']) else ""}
+                    {f"<br>{store['store_email']}" if store['store_email'] else ""}
                     {f"<br>GST: {store['store_gst']}" if store['store_gst'] else ""}
                 </div>
             </div>
@@ -171,8 +171,8 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
 
             <table class="totals">
                 <tr><td>Subtotal</td><td style="text-align:right;">{currency} {sale.subtotal:,.2f}</td></tr>
-                <tr><td>Discount</td><td style="text-align:right;">-{currency} {sale.discount:,.2f}</td></tr>
-                <tr><td>Tax</td><td style="text-align:right;">+{currency} {sale.tax:,.2f}</td></tr>
+                {f"<tr><td>Discount</td><td style='text-align:right;'>-{currency} {sale.discount:,.2f}</td></tr>" if sale.discount and sale.discount > 0 else ""}
+                {f"<tr><td>Tax</td><td style='text-align:right;'>+{currency} {sale.tax:,.2f}</td></tr>" if sale.tax and sale.tax > 0 else ""}
                 <tr class="grand-total"><td>Total</td><td style="text-align:right;">{currency} {sale.total:,.2f}</td></tr>
             </table>
 
