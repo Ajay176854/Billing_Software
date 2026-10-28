@@ -146,7 +146,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          padding: 5.5mm 2mm 1.5mm 2mm;
+          padding: 8.5mm 2mm 1.5mm 2mm;
           page-break-after: always;
         }
         .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 4px; padding-bottom: 2px; }
@@ -161,7 +161,12 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             size: ${labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
           }
           body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .label-page { border: none !important; width: 100%; height: 100%; padding: 5.5mm 1.5mm 1.5mm 1.5mm !important; }
+          .label-page { 
+            border: none !important; 
+            width: 100%; 
+            height: 100%; 
+            padding: ${labelSize === '50x25' ? '6.5mm' : '8mm'} 1.5mm 1.5mm 1.5mm !important; 
+          }
         }
       `);
       iframeDoc.write('</style></head><body>');
@@ -207,7 +212,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 width: labelSize === '40x30' ? '180px' : '210px',
                 minHeight: labelSize === '50x25' ? '110px' : '135px',
               }}
-              className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-6 px-3 pb-2.5 flex flex-col items-center justify-center text-center shadow-xs"
+              className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-9 px-3 pb-3 flex flex-col items-center justify-start text-center shadow-xs"
             >
               {/* Store Header centered in the middle */}
               {showStoreHeader && (

@@ -84,8 +84,8 @@ def build_tspl_label(
         "CLS",
     ]
 
-    # Top breathing space (y > 0 so text doesn't touch or print over the top edge/peel gap)
-    top_y = 28 if height_mm >= 30 else 20
+    # Top breathing space (shifted down to prevent top clipping and balance bottom margin)
+    top_y = 52 if height_mm >= 30 else 36
 
     # Price string formatting
     price_str = ""
@@ -98,9 +98,11 @@ def build_tspl_label(
         store_w = len(clean_store) * 24
         store_x = max(10, int(((width_mm * 8) - store_w) / 2))
         lines.append(f'TEXT {store_x},{top_y},"4",0,1,1,"{clean_store}"')
+        prod_y = top_y + (38 if height_mm >= 30 else 32)
+    else:
+        prod_y = top_y + (20 if height_mm >= 30 else 12)
 
     # Line 2: Product Name on left and Price on right
-    prod_y = top_y + (36 if height_mm >= 30 else 28)
     clean_name = product_name[:18].replace('"', '').strip()
     lines.append(f'TEXT 20,{prod_y},"3",0,1,1,"{clean_name}"')
 
@@ -109,7 +111,7 @@ def build_tspl_label(
         lines.append(f'TEXT {price_x},{prod_y},"3",0,1,1,"{price_str}"')
 
     # Line 3: Wide Barcode expanded across label (narrow=3, wide=6, height=48) for easy scanner detection
-    barcode_y = prod_y + (36 if height_mm >= 30 else 28)
+    barcode_y = prod_y + (38 if height_mm >= 30 else 32)
     barcode_h = 48 if height_mm >= 30 else 36
     if barcode:
         clean_code = str(barcode).strip().replace('"', '')
