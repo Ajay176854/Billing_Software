@@ -12,6 +12,6 @@ psycopg2-binary
 slowapi
 pg8000
 redis
-pywebview
-pywin32
-pyinstaller
+pywebview; sys_platform == 'win32'
+pywin32; sys_platform == 'win32'
+pyinstaller; sys_platform == 'win32'
