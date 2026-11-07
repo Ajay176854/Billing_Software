@@ -199,7 +199,7 @@ def direct_test_label(label_size: Optional[str] = "14x100mm", db: Session = Depe
             product_name="24K GOLD RING" if is_jewellery else "Moira Luxury Item",
             barcode="94685000" if is_jewellery else "ML-10023",
             price=26900.0 if is_jewellery else 1299.0,
-            store_name=store.get("store_name", "MOIRA LUXE"),
+            store_name="wt. 2.5gm" if is_jewellery else store.get("store_name", "MOIRA LUXE"),
             copies=1,
             width_mm=width,
             height_mm=height,
