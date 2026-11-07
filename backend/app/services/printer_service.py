@@ -124,15 +124,15 @@ def build_tspl_label(
         clean_code = str(barcode or "").strip().replace('"', "")[:10]
 
         # Print all 3 horizontal stickers simultaneously across the 3-up roll in FULL LANDSCAPE
-        # Uses bold Font "2" and large barcode to fill the entire head flap (Y = 25 to 335)
-        # - Part 1 (Top Section: Y = 25 to 175): Bold Product Name, Weight/Brand, and Price
-        # - Dashed Fold Line at Y = 180: Divides the two sections so they fold back-to-back
-        # - Part 2 (Bottom Section: Y = 195 to 335): Full-width Barcode and code text
+        # Uses bold Font "2" and large barcode to fill the entire head flap (Y = 25 to 430)
+        # - Part 1 (Top Section: Y = 25 to 215): Bold Product Name, Weight/Brand, and Price
+        # - Dashed Fold Line at Y = 225: Centered fold line dividing the flap into equal halves
+        # - Part 2 (Bottom Section: Y = 245 to 430): Wide Barcode and code text filling lower flap
         for col_idx in range(3):
             col_x = col_starts[col_idx]
 
-            # --- PART 1: Details (One side in Landscape: rotation = 90) ---
-            # Font "2" (12x20 dots) bold text reading along length (Y = 25 to ~175)
+            # --- PART 1: Details (Top half in Landscape: rotation = 90) ---
+            # Font "2" (12x20 dots) bold text reading along length (Y = 25 to ~215)
             lines.append(f'TEXT {col_x + 95},25,"2",90,1,1,"{clean_name}"')
             if show_header and clean_store:
                 lines.append(f'TEXT {col_x + 65},25,"2",90,1,1,"{clean_store}"')
@@ -140,16 +140,16 @@ def build_tspl_label(
                 price_x = col_x + 35 if (show_header and clean_store) else col_x + 55
                 lines.append(f'TEXT {price_x},25,"2",90,1,1,"{price_str}"')
 
-            # --- Dashed separator / fold line at Y = 180 ---
-            fold_y = 180
+            # --- Dashed separator / fold line at exact center of flap (Y = 225) ---
+            fold_y = 225
             for dx in range(col_x + 6, col_x + 98, 12):
                 lines.append(f"BAR {dx},{fold_y},6,2")
 
-            # --- PART 2: Barcode Tag (Other side in Landscape: rotation = 90) ---
+            # --- PART 2: Barcode Tag (Bottom half in Landscape: rotation = 90) ---
             if clean_code:
-                # Full-size Barcode: height = 50 dots, narrow = 2, wide = 4 (fills Y = 195 to 335)
-                lines.append(f'BARCODE {col_x + 85},195,"128",50,0,90,2,4,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 25},215,"2",90,1,1,"{clean_code}"')
+                # Full-size Barcode: height = 60 dots, narrow = 2, wide = 4 (fills Y = 245 to 430)
+                lines.append(f'BARCODE {col_x + 85},245,"128",60,0,90,2,4,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 20},265,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
