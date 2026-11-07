@@ -24,7 +24,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   productCode,
   productName,
   price,
-  currencySymbol = '₹',
+  currencySymbol = 'Rs.',
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   
@@ -41,17 +41,12 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
     return saved === '50x25' || saved === '40x30' ? saved : '50x30';
   });
 
-  const [tagDetails, setTagDetails] = useState(() => {
-    return localStorage.getItem('last_tag_details') || 'wt. 2.5gm';
-  });
-
   const [showPrice, setShowPrice] = useState(true);
   const [showQr, setShowQr] = useState(false);
   const [showStoreHeader, setShowStoreHeader] = useState(true);
-  const [showTagDetails, setShowTagDetails] = useState(true);
   const [copies, setCopies] = useState(1);
   const [storeName, setStoreName] = useState(() => {
-    return localStorage.getItem('store_name') || 'MOIRA LUXE';
+    return localStorage.getItem('store_name') || 'Moira Luxe';
   });
   const [printingDirect, setPrintingDirect] = useState(false);
 
@@ -85,14 +80,13 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
         product_name: productName,
         barcode: productCode,
         price: showPrice ? price : undefined,
-        store_name: isTagging ? (showTagDetails ? tagDetails : '') : (showStoreHeader ? storeName : ''),
-        tag_details: isTagging ? (showTagDetails ? tagDetails : '') : undefined,
+        store_name: showStoreHeader ? storeName : '',
         copies: copies,
         width_mm: dimensions.width,
         height_mm: dimensions.height,
         label_type: labelMode,
         show_price: showPrice,
-        show_header: isTagging ? showTagDetails : showStoreHeader,
+        show_header: showStoreHeader,
       };
 
       // Send directly to local FastAPI server via configured api client
@@ -106,7 +100,6 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
       toast.success(res.data?.message || `Printed ${copies} ${isTagging ? 'tag' : 'label'}(s) directly to DEV 632-L58P!`);
       localStorage.setItem('label_mode', labelMode);
       if (isTagging) {
-        localStorage.setItem('last_tag_details', tagDetails);
         localStorage.setItem('hardware_label_size', '14x100');
       } else {
         localStorage.setItem('hardware_normal_size', normalSize);
@@ -295,19 +288,19 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                           {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
                         </span>
 
-                        {/* Part 1: Front Face Details (Product Name, Weight/Tag Detail, Price) */}
+                        {/* Part 1: Front Face Details (Line 1: Store Name, Line 2: Product Name, Line 3: Price) */}
                         <div className="w-full text-center py-0.5">
-                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate">
-                            {productName}
-                          </div>
-                          {showTagDetails && (tagDetails || storeName) && (
-                            <div className="text-[8px] font-bold text-gray-700 leading-tight mt-0.5 truncate">
-                              {tagDetails || storeName}
+                          {showStoreHeader && storeName && (
+                            <div className="text-[9px] font-bold text-gray-800 leading-tight uppercase tracking-wider truncate">
+                              {storeName}
                             </div>
                           )}
+                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate mt-0.5">
+                            {productName}
+                          </div>
                           {showPrice && price !== undefined && (
                             <div className="text-[9.5px] font-extrabold text-emerald-700 mt-0.5">
-                              {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              Rs. {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
                             </div>
                           )}
                         </div>
@@ -380,7 +373,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
 
                   {showPrice && price !== undefined && (
                     <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
-                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      Rs. {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
                     </span>
                   )}
                 </div>
@@ -419,12 +412,15 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             /* Tagging Label Specific Controls */
             <div className="grid grid-cols-2 gap-3 bg-amber-50/50 border border-amber-200/80 p-4 rounded-xl text-xs">
               <div>
-                <label className="font-semibold text-gray-700 block mb-1.5">Tag Details / Weight</label>
+                <label className="font-semibold text-gray-700 block mb-1.5">Store / Brand Name (Line 1)</label>
                 <input
                   type="text"
-                  placeholder="e.g. wt. 2.5gm or Hallmarking"
-                  value={tagDetails}
-                  onChange={(e) => setTagDetails(e.target.value)}
+                  placeholder="e.g. Moira Luxe"
+                  value={storeName}
+                  onChange={(e) => {
+                    setStoreName(e.target.value);
+                    localStorage.setItem('store_name', e.target.value);
+                  }}
                   className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
                 />
               </div>
@@ -445,21 +441,21 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={showPrice}
-                    onChange={(e) => setShowPrice(e.target.checked)}
+                    checked={showStoreHeader}
+                    onChange={(e) => setShowStoreHeader(e.target.checked)}
                     className="rounded text-amber-600 focus:ring-0"
                   />
-                  Show MRP Price
+                  Show Store Name (Line 1)
                 </label>
 
                 <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={showTagDetails}
-                    onChange={(e) => setShowTagDetails(e.target.checked)}
+                    checked={showPrice}
+                    onChange={(e) => setShowPrice(e.target.checked)}
                     className="rounded text-amber-600 focus:ring-0"
                   />
-                  Show Tag Details (Weight / Line 2)
+                  Show MRP Price (Line 3)
                 </label>
               </div>
             </div>

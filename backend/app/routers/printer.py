@@ -55,11 +55,8 @@ def direct_print_label(payload: DirectLabelRequest, db: Session = Depends(get_db
         store = get_store_settings(db)
         is_tagging = (payload.label_type == "tagging") or ((payload.width_mm or 50) <= 20 and (payload.height_mm or 30) >= 70)
         
-        # In tagging mode, tag_details takes precedence for the second line (e.g. weight, purity)
-        if is_tagging:
-            effective_store_name = payload.tag_details if payload.tag_details is not None else (payload.store_name or store.get("store_name", "MOIRA LUXE"))
-        else:
-            effective_store_name = payload.store_name or store.get("store_name", "MOIRA LUXE")
+        # Store / brand header (e.g. Moira Luxe)
+        effective_store_name = payload.store_name or payload.tag_details or store.get("store_name", "Moira Luxe")
 
         raw_bytes = build_tspl_label(
             product_name=payload.product_name,

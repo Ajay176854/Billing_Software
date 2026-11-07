@@ -130,13 +130,18 @@ def build_tspl_label(
             col_x = col_starts[col_idx]
 
             # --- PART 1: Front Face Details (Y = 25 to 185) ---
-            # All details finish BEFORE Y = 190 so nothing ever crosses the fold line
-            lines.append(f'TEXT {col_x + 95},25,"2",90,1,1,"{clean_name}"')
+            # Line 1: Store Name (e.g. Moira Luxe)
+            # Line 2: Product Name (e.g. Antitarnish Bangle)
+            # Line 3: Price (e.g. Rs. 280/-)
             if show_header and clean_store:
-                lines.append(f'TEXT {col_x + 65},40,"2",90,1,1,"{clean_store}"')
-            if show_price and price_str:
-                price_x = col_x + 35 if (show_header and clean_store) else col_x + 55
-                lines.append(f'TEXT {price_x},30,"2",90,1,1,"{price_str}"')
+                lines.append(f'TEXT {col_x + 95},25,"2",90,1,1,"{clean_store}"')
+                lines.append(f'TEXT {col_x + 65},25,"2",90,1,1,"{clean_name}"')
+                if show_price and price_str:
+                    lines.append(f'TEXT {col_x + 35},30,"2",90,1,1,"{price_str}"')
+            else:
+                lines.append(f'TEXT {col_x + 80},25,"2",90,1,1,"{clean_name}"')
+                if show_price and price_str:
+                    lines.append(f'TEXT {col_x + 45},30,"2",90,1,1,"{price_str}"')
 
             # --- Centered Fold Line at exact physical fold (Y = 250) ---
             # Solid divider line '|' separating front face details from back face barcode
