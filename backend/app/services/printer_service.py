@@ -140,16 +140,15 @@ def build_tspl_label(
                 price_x = col_x + 35 if (show_header and clean_store) else col_x + 55
                 lines.append(f'TEXT {price_x},30,"2",90,1,1,"{price_str}"')
 
-            # --- Centered Fold Line at exact physical fold (Y = 200) ---
-            fold_y = 200
-            for dx in range(col_x + 6, col_x + 98, 12):
-                lines.append(f"BAR {dx},{fold_y},6,2")
+            # --- Centered Fold Line at exact physical fold (Y = 250) ---
+            # Solid divider line '|' separating front face details from back face barcode
+            lines.append(f"BAR {col_x + 6},250,92,3")
 
-            # --- PART 2: Back Face Barcode Tag (Y = 225 to 365) ---
-            # Starts safely AFTER the fold line (Y = 225) and finishes well before the neck (Y = 380)
+            # --- PART 2: Back Face Barcode Tag (Y = 275 to 415) ---
+            # Starts safely AFTER the middle divider line (Y = 250) and finishes well before the neck (Y = 480)
             if clean_code:
-                lines.append(f'BARCODE {col_x + 85},225,"128",55,0,90,2,4,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 22},245,"2",90,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {col_x + 85},275,"128",55,0,90,2,4,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 22},295,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
