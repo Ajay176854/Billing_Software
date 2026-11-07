@@ -101,7 +101,7 @@ def build_tspl_label(
             "SIZE 50 mm, 100 mm",
             "GAP 2 mm, 0 mm",
             "DIRECTION 0",
-            "DENSITY 11",
+            "DENSITY 12",
             "CLS",
         ]
 
@@ -147,11 +147,11 @@ def build_tspl_label(
             # Solid divider line '|' separating front face details from back face barcode
             lines.append(f"BAR {col_x + 6},250,92,3")
 
-            # --- PART 2: Back Face Barcode Tag (Y = 275 to 415) ---
-            # Starts safely AFTER the middle divider line (Y = 250) and finishes well before the neck (Y = 480)
+            # --- PART 2: Back Face Barcode Tag (Centered between fold Y=250 and neck Y=460) ---
+            # Using narrow=1, wide=2 so entire barcode + quiet zones fit fully on flat head flap with zero neck clipping
             if clean_code:
-                lines.append(f'BARCODE {col_x + 85},275,"128",55,0,90,2,4,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 22},295,"2",90,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {col_x + 85},285,"128",55,0,90,1,2,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 22},305,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
