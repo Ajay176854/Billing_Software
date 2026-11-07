@@ -107,14 +107,11 @@ def build_tspl_label(
             "CLS",
         ]
 
-        # Clean store name (max 10 chars)
-        clean_store = (store_name or "").strip().replace('"', "")[:10]
+        # Clean product name (max 18 chars in landscape)
+        clean_name = product_name.strip().replace('"', "")[:18]
 
-        # Clean product name (max 13 characters on a single line so it fits without wrapping)
-        clean_name = product_name.strip().replace('"', "")[:13]
-
-        # Clean store name (max 12 characters)
-        clean_store = (store_name or "").strip().replace('"', "")[:12]
+        # Clean store name (max 16 chars in landscape)
+        clean_store = (store_name or "").strip().replace('"', "")[:16]
 
         # Format price to fit comfortably (e.g. "Rs. 26900/-")
         price_str = ""
@@ -126,42 +123,33 @@ def build_tspl_label(
 
         clean_code = str(barcode or "").strip().replace('"', "")[:10]
 
-        # Print all 3 horizontal stickers simultaneously across the 3-up roll
-        # Flap layout has two distinct sections (matching standard jewellery dumbbell format):
-        # - Part 1 (Top Section): Product Name, Store / Brand, and Price
-        # - Dashed Fold Line: Divides the two sections so they fold back-to-back
-        # - Part 2 (Bottom Section): High-visibility Barcode tag and code text
-        CHAR_W = 8  # Font "1" pitch is 8 dots per char
+        # Print all 3 horizontal stickers simultaneously across the 3-up roll in LANDSCAPE
+        # Content is rotated 90 degrees so that when viewed horizontally:
+        # - One side: Details (Product Name, Store/Weight, and Price)
+        # - Dashed Fold Line in the middle
+        # - Other side: High-visibility Barcode tag and code text
         for col_idx in range(3):
             col_x = col_starts[col_idx]
 
-            def get_x(txt: str, char_w: int = CHAR_W) -> int:
-                w = len(txt) * char_w
-                return col_x + max(1, int((LABEL_W - w) / 2))
-
-            # --- PART 1: Details (One side when folded) ---
-            part1_y = 20
-            if clean_name:
-                lines.append(f'TEXT {get_x(clean_name)},{part1_y},"1",0,1,1,"{clean_name}"')
-                part1_y += 26
-
+            # --- PART 1: Details (One side in Landscape: rotation = 90) ---
+            # Font "1" with 90° rotation reads along Y (20 to ~140)
+            # Lines are stacked across X within the 114-dot sticker width
+            lines.append(f'TEXT {col_x + 90},20,"1",90,1,1,"{clean_name}"')
             if show_header and clean_store:
-                lines.append(f'TEXT {get_x(clean_store)},{part1_y},"1",0,1,1,"{clean_store}"')
-                part1_y += 24
-
+                lines.append(f'TEXT {col_x + 65},20,"1",90,1,1,"{clean_store}"')
             if show_price and price_str:
-                lines.append(f'TEXT {get_x(price_str)},{part1_y},"1",0,1,1,"{price_str}"')
+                price_x = col_x + 40 if (show_header and clean_store) else col_x + 55
+                lines.append(f'TEXT {price_x},20,"1",90,1,1,"{price_str}"')
 
             # --- Dashed separator / fold line between Part 1 and Part 2 ---
-            fold_y = 104
+            fold_y = 155
             for dx in range(col_x + 8, col_x + 96, 12):
                 lines.append(f"BAR {dx},{fold_y},6,1")
 
-            # --- PART 2: Barcode Tag (Reverse side when folded) ---
+            # --- PART 2: Barcode Tag (Other side in Landscape: rotation = 90) ---
             if clean_code:
-                bc_x = col_x + max(4, int((LABEL_W - (len(clean_code) * 9 + 6)) / 2))
-                lines.append(f'BARCODE {bc_x},122,"128",40,0,0,1,2,"{clean_code}"')
-                lines.append(f'TEXT {get_x(clean_code)},170,"1",0,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {col_x + 80},175,"128",38,0,90,1,2,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 35},185,"1",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
