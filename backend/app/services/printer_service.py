@@ -101,7 +101,7 @@ def build_tspl_label(
             "SIZE 50 mm, 100 mm",
             "GAP 2 mm, 0 mm",
             "DIRECTION 0",
-            "DENSITY 12",
+            "DENSITY 11",
             "CLS",
         ]
 
@@ -129,29 +129,30 @@ def build_tspl_label(
         for col_idx in range(3):
             col_x = col_starts[col_idx]
 
-            # --- PART 1: Front Face Details (Y = 25 to 185) ---
+            # --- PART 1: Front Face Details (Y = 15 to 230) ---
             # Line 1: Store Name (e.g. Moira Luxe)
             # Line 2: Product Name (e.g. Antitarnish Bangle)
             # Line 3: Price (e.g. Rs. 280/-)
             if show_header and clean_store:
-                lines.append(f'TEXT {col_x + 95},25,"2",90,1,1,"{clean_store}"')
-                lines.append(f'TEXT {col_x + 65},25,"2",90,1,1,"{clean_name}"')
+                lines.append(f'TEXT {col_x + 95},15,"2",90,1,1,"{clean_store}"')
+                lines.append(f'TEXT {col_x + 65},15,"2",90,1,1,"{clean_name}"')
                 if show_price and price_str:
-                    lines.append(f'TEXT {col_x + 35},30,"2",90,1,1,"{price_str}"')
+                    lines.append(f'TEXT {col_x + 35},20,"2",90,1,1,"{price_str}"')
             else:
-                lines.append(f'TEXT {col_x + 80},25,"2",90,1,1,"{clean_name}"')
+                lines.append(f'TEXT {col_x + 80},15,"2",90,1,1,"{clean_name}"')
                 if show_price and price_str:
-                    lines.append(f'TEXT {col_x + 45},30,"2",90,1,1,"{price_str}"')
+                    lines.append(f'TEXT {col_x + 45},20,"2",90,1,1,"{price_str}"')
 
-            # --- Centered Fold Line at exact physical fold (Y = 250) ---
+            # --- Centered Fold Line at exact physical fold (Y = 238) ---
             # Solid divider line '|' separating front face details from back face barcode
-            lines.append(f"BAR {col_x + 6},250,92,3")
+            lines.append(f"BAR {col_x + 6},238,92,3")
 
-            # --- PART 2: Back Face Barcode Tag (Centered between fold Y=250 and neck Y=460) ---
-            # Using narrow=1, wide=2 so entire barcode + quiet zones fit fully on flat head flap with zero neck clipping
+            # --- PART 2: Back Face Barcode Tag (Y = 245 to 469) ---
+            # narrow=2 (10 mil standard) ensures crisp scannable bar/space ratios without thermal bleed
+            # Starting at Y=245 guarantees entire barcode + quiet zone finish safely before neck (Y=480)
             if clean_code:
-                lines.append(f'BARCODE {col_x + 85},285,"128",55,0,90,1,2,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 22},305,"2",90,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {col_x + 85},245,"128",55,0,90,2,4,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 22},265,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
