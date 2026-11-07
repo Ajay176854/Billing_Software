@@ -110,63 +110,58 @@ def build_tspl_label(
         # Clean store name (max 10 chars)
         clean_store = (store_name or "").strip().replace('"', "")[:10]
 
-        # Clean product name - wrap into max 10 chars per line (up to 2 lines)
-        clean_name = product_name.strip().replace('"', "")
-        words = clean_name.split()
-        name_lines = []
-        buf = ""
-        for w in words:
-            if not buf:
-                buf = w[:10]
-            elif len(buf) + 1 + len(w) <= 10:
-                buf += " " + w
-            else:
-                name_lines.append(buf[:10])
-                buf = w[:10]
-        if buf:
-            name_lines.append(buf[:10])
-        name_lines = name_lines[:2]
+        # Clean product name (max 13 characters on a single line so it fits without wrapping)
+        clean_name = product_name.strip().replace('"', "")[:13]
 
-        # Format price to fit comfortably within 10 chars
+        # Clean store name (max 12 characters)
+        clean_store = (store_name or "").strip().replace('"', "")[:12]
+
+        # Format price to fit comfortably (e.g. "Rs. 26900/-")
         price_str = ""
         if show_price and price is not None:
             p_val = int(price) if price == int(price) else price
-            price_str = f"Rs.{p_val:,}" if isinstance(p_val, int) else f"Rs.{p_val:,.2f}"
-            if len(price_str) > 10:
-                price_str = f"Rs.{int(price)}"[:10]
+            price_str = f"Rs. {p_val}/-" if isinstance(p_val, int) else f"Rs. {p_val:.2f}/-"
+            if len(price_str) > 13:
+                price_str = f"Rs.{int(price)}"[:12]
 
         clean_code = str(barcode or "").strip().replace('"', "")[:10]
 
-        # Print all 3 horizontal stickers in the row simultaneously so no sticker is wasted
+        # Print all 3 horizontal stickers simultaneously across the 3-up roll
         # Flap layout has two distinct sections (matching standard jewellery dumbbell format):
-        # - Part 1 (Top Section): Brand, Product Name, and Price
+        # - Part 1 (Top Section): Product Name, Store / Brand, and Price
+        # - Dashed Fold Line: Divides the two sections so they fold back-to-back
         # - Part 2 (Bottom Section): High-visibility Barcode tag and code text
+        CHAR_W = 8  # Font "1" pitch is 8 dots per char
         for col_idx in range(3):
             col_x = col_starts[col_idx]
 
             def get_x(txt: str, char_w: int = CHAR_W) -> int:
                 w = len(txt) * char_w
-                return col_x + max(2, int((LABEL_W - w) / 2))
+                return col_x + max(1, int((LABEL_W - w) / 2))
 
-            # --- PART 1: Brand, Product Name & Price ---
-            part1_y = 24
-            if show_header and clean_store:
-                lines.append(f'TEXT {get_x(clean_store)},{part1_y},"1",0,1,1,"{clean_store}"')
+            # --- PART 1: Details (One side when folded) ---
+            part1_y = 20
+            if clean_name:
+                lines.append(f'TEXT {get_x(clean_name)},{part1_y},"1",0,1,1,"{clean_name}"')
                 part1_y += 26
 
-            for nline in name_lines:
-                lines.append(f'TEXT {get_x(nline)},{part1_y},"1",0,1,1,"{nline}"')
+            if show_header and clean_store:
+                lines.append(f'TEXT {get_x(clean_store)},{part1_y},"1",0,1,1,"{clean_store}"')
                 part1_y += 24
 
             if show_price and price_str:
                 lines.append(f'TEXT {get_x(price_str)},{part1_y},"1",0,1,1,"{price_str}"')
 
-            # --- PART 2: Barcode Tag Section (Lower part of head flap) ---
+            # --- Dashed separator / fold line between Part 1 and Part 2 ---
+            fold_y = 104
+            for dx in range(col_x + 8, col_x + 96, 12):
+                lines.append(f"BAR {dx},{fold_y},6,1")
+
+            # --- PART 2: Barcode Tag (Reverse side when folded) ---
             if clean_code:
-                part2_y = 175
                 bc_x = col_x + max(4, int((LABEL_W - (len(clean_code) * 9 + 6)) / 2))
-                lines.append(f'BARCODE {bc_x},{part2_y},"128",44,0,0,1,2,"{clean_code}"')
-                lines.append(f'TEXT {get_x(clean_code)},{part2_y + 48},"1",0,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {bc_x},122,"128",40,0,0,1,2,"{clean_code}"')
+                lines.append(f'TEXT {get_x(clean_code)},170,"1",0,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1

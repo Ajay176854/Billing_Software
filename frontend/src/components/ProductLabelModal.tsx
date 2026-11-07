@@ -229,18 +229,18 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                           {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
                         </span>
 
-                        {/* Part 1: Brand, Product Name & Price */}
-                        <div className="w-full py-1 border-b border-dashed border-amber-300/80 mb-1">
+                        {/* Part 1: Product Name, Brand & Price */}
+                        <div className="w-full py-1 border-b-2 border-dashed border-amber-300 mb-1">
+                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
+                            {productName}
+                          </div>
                           {showStoreHeader && (
-                            <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
+                            <div className="text-[8.5px] font-semibold text-gray-600 leading-tight mt-0.5 truncate max-w-full">
                               {storeName}
                             </div>
                           )}
-                          <div className="text-[9px] font-bold text-gray-800 leading-tight mt-0.5 max-w-full break-words">
-                            {productName}
-                          </div>
                           {showPrice && price !== undefined && (
-                            <div className="text-[10.5px] font-extrabold text-emerald-700 mt-0.5">
+                            <div className="text-[10px] font-extrabold text-emerald-700 mt-0.5">
                               {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                             </div>
                           )}
