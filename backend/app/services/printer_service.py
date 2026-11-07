@@ -143,16 +143,16 @@ def build_tspl_label(
                 if show_price and price_str:
                     lines.append(f'TEXT {col_x + 45},20,"2",90,1,1,"{price_str}"')
 
-            # --- Centered Fold Marks (Edge ticks only at Y = 238) ---
-            # Subtle fold guide ticks at the outer edges only so the center quiet zone is 100% pure white for scanners
-            lines.append(f"BAR {col_x + 4},238,12,2")
-            lines.append(f"BAR {col_x + 88},238,12,2")
+            # --- Centered Fold Marks (Outer edge ticks at Y = 236) ---
+            lines.append(f"BAR {col_x + 2},236,8,2")
+            lines.append(f"BAR {col_x + 94},236,8,2")
 
-            # --- PART 2: Back Face Barcode Tag (Y = 255 to 479) ---
-            # Clean leading quiet zone (17 dots) + crisp 10-mil bars (narrow=2) + full trailing quiet zone before neck
+            # --- PART 2: Back Face 2D QR Code Tag (Jewellery Industry Standard) ---
+            # 84x84 dot QR code centered across 14.3mm flap + clean code text underneath
+            # Instant 360-degree omnidirectional scanning from any angle
             if clean_code:
-                lines.append(f'BARCODE {col_x + 85},255,"128",55,0,90,2,4,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 22},275,"2",90,1,1,"{clean_code}"')
+                lines.append(f'QRCODE {col_x + 10},265,M,4,A,0,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 60},365,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1

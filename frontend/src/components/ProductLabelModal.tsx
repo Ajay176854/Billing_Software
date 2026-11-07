@@ -271,7 +271,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
               /* Specialized Seznik 14.3mm x 100mm 3-Up Jewellery Dumbbell Tags Preview */
               <div className="flex flex-col items-center w-full">
                 <div className="flex items-center gap-1.5 mb-2.5 px-3 py-1 bg-amber-100/80 border border-amber-300 rounded-full text-amber-900 text-[10px] font-bold">
-                  <span>✨ 3-Up Roll: 3 Stickers Print Simultaneously in Landscape Across the Roll</span>
+                  <span>✨ 3-Up Jewellery Tags: 3 Stickers per row with Instant 360° QR Scanning</span>
                 </div>
                 <div
                   ref={printRef}
@@ -305,28 +305,28 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                           )}
                         </div>
 
-                        {/* Solid Middle Divider Line | */}
-                        <div className="w-full my-1 relative flex items-center justify-center">
-                          <div className="w-full border-t-2 border-amber-600" />
-                          <span className="absolute bg-white px-1 text-[7px] font-bold text-amber-800 border border-amber-300 rounded-xs">
-                            Fold |
+                        {/* Fold Guide Line */}
+                        <div className="w-full my-1 relative flex items-center justify-between px-0.5">
+                          <div className="w-2 border-t-2 border-amber-600" />
+                          <span className="text-[6.5px] font-bold text-amber-700 uppercase tracking-widest">
+                            Fold
                           </span>
+                          <div className="w-2 border-t-2 border-amber-600" />
                         </div>
 
-                        {/* Part 2: Back Face Barcode (Starts after the middle line) */}
-                        <div className="barcode-wrap flex flex-col items-center justify-center w-full py-0.5 overflow-hidden">
+                        {/* Part 2: Back Face 2D QR Code Tag (Jewellery Industry Standard) */}
+                        <div className="flex flex-col items-center justify-center w-full py-1">
                           {productCode ? (
-                            <Barcode
-                              value={productCode}
-                              height={24}
-                              width={0.9}
-                              fontSize={8}
-                              margin={0}
-                              displayValue={true}
-                              background="transparent"
-                            />
+                            <>
+                              <div className="p-0.5 bg-white border border-gray-200 rounded-xs shadow-2xs">
+                                <QRCodeSVG value={productCode} size={42} level="M" />
+                              </div>
+                              <span className="text-[7.5px] font-bold text-gray-800 mt-0.5 tracking-wider">
+                                {productCode}
+                              </span>
+                            </>
                           ) : (
-                            <span className="text-[7.5px] text-gray-400">No Barcode</span>
+                            <span className="text-[7.5px] text-gray-400">No Code</span>
                           )}
                         </div>
                       </div>

@@ -103,8 +103,8 @@ def customer_traffic(
 
 @router.get("/monitoring")
 def monitoring(
-    period: str = Query("daily", regex="^(daily|monthly)$"),
-    group_by: str = Query("overall", regex="^(overall|product)$"),
+    period: str = Query("daily", pattern="^(daily|monthly)$"),
+    group_by: str = Query("overall", pattern="^(overall|product)$"),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     db: Session = Depends(get_db),
