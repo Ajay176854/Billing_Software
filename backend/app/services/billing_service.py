@@ -13,14 +13,12 @@ inside a single database transaction:
 """
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
 from fastapi import HTTPException, status
 
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.stock_transaction import StockTransaction
-from app.models.setting import Setting
 from app.schemas.sale import BillRequest
 
 

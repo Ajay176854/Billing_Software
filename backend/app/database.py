@@ -7,10 +7,11 @@ from app.config import settings
 
 # Prefer native C-optimized psycopg2 driver when available for maximum speed and lowest latency.
 # Fall back to pure-python pg8000 only if psycopg2 is missing (e.g. serverless environments).
-try:
-    import psycopg2
+from importlib.util import find_spec
+
+if find_spec("psycopg2") is not None:
     driver = "psycopg2"
-except ImportError:
+else:
     driver = "pg8000"
 
 connect_args = {}

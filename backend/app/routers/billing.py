@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.schemas.sale import BillRequest, SaleResponse, SaleItemResponse
+from app.schemas.sale import BillRequest, SaleResponse
 from app.services.billing_service import complete_sale
 from app.services.invoice_service import generate_invoice_html
 

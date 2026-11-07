@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import api from '../api/client';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -327,16 +328,16 @@ export default function Reports() {
         // @ts-ignore
         const saved = await window.pywebview.api.save_excel(base64, filename);
         if (saved) {
-          import('react-hot-toast').then(({ default: toast }) => toast.success('Export saved successfully!'));
+          toast.success('Export saved successfully!');
         }
       } else {
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         saveAs(blob, filename);
-        import('react-hot-toast').then(({ default: toast }) => toast.success('Export successful!'));
+        toast.success('Export successful!');
       }
     } catch (err: any) {
       console.error(err);
-      import('react-hot-toast').then(({ default: toast }) => toast.error('Export failed: ' + (err.message || 'Unknown error')));
+      toast.error('Export failed: ' + (err.message || 'Unknown error'));
     }
   };
 

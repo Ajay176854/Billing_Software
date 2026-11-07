@@ -2,7 +2,6 @@
 Printer Service — Direct USB/Hardware RAW printing for TSPL (labels) and ESC/POS (receipts).
 Bypasses the browser print preview dialog and prints directly to the physical printer.
 """
-import sys
 from datetime import datetime
 from typing import List, Optional
 
@@ -199,32 +198,29 @@ def build_tspl_label(
     else:
         prod_y = top_y + (20 if norm_h >= 30 else 12)
 
-    # Line 2: Product Name on left and Price on right
+    # Line 2: Product Name on left (with left margin space) and Price on right
     # DEV 632-L58P thermal head is 384 dots max (48mm). Safe right margin is 350 dots.
+    left_margin = 35
     safe_right = min(350, int((norm_w * 8) - 25))
     if show_price and price_str:
         # Font 2 is 12x20 dots per char
         price_w = len(price_str) * 12
         price_x = max(180, safe_right - price_w)
-        # Allocate remaining space for product name with guaranteed gap to prevent overlap
-        avail_dots = max(60, price_x - 30)
+        # Allocate remaining space for product name with safe gap before price
+        avail_dots = max(50, price_x - left_margin - 15)
         max_chars = int(avail_dots / 12)
         clean_name = product_name[:max_chars].replace('"', '').strip()
-        lines.append(f'TEXT 15,{prod_y},"2",0,1,1,"{clean_name}"')
+        lines.append(f'TEXT {left_margin},{prod_y},"2",0,1,1,"{clean_name}"')
         lines.append(f'TEXT {price_x},{prod_y},"2",0,1,1,"{price_str}"')
     else:
-        avail_dots = max(100, safe_right - 25)
+        avail_dots = max(80, safe_right - left_margin)
         max_chars = int(avail_dots / 12)
         clean_name = product_name[:max_chars].replace('"', '').strip()
-        lines.append(f'TEXT 15,{prod_y},"2",0,1,1,"{clean_name}"')
+        lines.append(f'TEXT {left_margin},{prod_y},"2",0,1,1,"{clean_name}"')
 
-    # Line 2.5: Professional horizontal divider bar under product name & price
-    divider_y = prod_y + 24
-    lines.append(f"BAR 15,{divider_y},{safe_right - 15},2")
-
-    # Line 3: Barcode or QR Code centered across the label
-    barcode_y = divider_y + 8
-    barcode_h = 50 if norm_h >= 30 else 36
+    # Line 3: Expanded Barcode or QR Code (no underline divider)
+    barcode_y = prod_y + (30 if norm_h >= 30 else 26)
+    barcode_h = 58 if norm_h >= 30 else 42
     if barcode:
         clean_code = str(barcode).strip().replace('"', '')
         if show_qr:
@@ -232,9 +228,18 @@ def build_tspl_label(
             qr_x = max(15, int(((norm_w * 8) - qr_w) / 2))
             lines.append(f'QRCODE {qr_x},{barcode_y},M,4,A,0,"{clean_code}"')
         else:
-            est_bc_w = len(clean_code) * 22 + 60
-            bc_x = max(15, int(((norm_w * 8) - est_bc_w) / 2))
-            lines.append(f'BARCODE {bc_x},{barcode_y},"128",{barcode_h},1,0,2,4,"{clean_code}"')
+            # Code 128 total module count: start(11) + data(len*11) + check(11) + stop(13) = len*11 + 35
+            tot_modules = len(clean_code) * 11 + 35
+            # Expand to wide module (narrow=3, wide=6) if it fits within safe label width (~355 dots)
+            if tot_modules * 3 <= min(355, int((norm_w * 8) - 25)):
+                narrow = 3
+                wide = 6
+            else:
+                narrow = 2
+                wide = 5
+            bc_w = tot_modules * narrow
+            bc_x = max(15, int(((norm_w * 8) - bc_w) / 2))
+            lines.append(f'BARCODE {bc_x},{barcode_y},"128",{barcode_h},1,0,{narrow},{wide},"{clean_code}"')
 
     lines.append(f"PRINT {max(1, copies)}")
     lines.append("")

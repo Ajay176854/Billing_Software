@@ -2,7 +2,6 @@
 Query Cache Middleware — In-Memory ultra-fast API response caching with instant mutation invalidation.
 Eliminates database latency while guaranteeing 100% fresh, live inventory across all pages.
 """
-import json
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response

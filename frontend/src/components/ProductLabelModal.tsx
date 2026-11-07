@@ -166,10 +166,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           padding: ${isTagging ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
           page-break-after: always;
         }
-        .label-header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 3px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+        .label-header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px; padding-bottom: 1px; }
         .store-header { font-size: 13.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; width: 100%; margin-top: 2px; margin-bottom: 4px; }
-        .product-name { font-weight: 700; font-size: 11.5px; line-height: 1.2; text-align: left; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; padding-right: 6px; }
-        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; flex-shrink: 0; }
+        .product-name { font-weight: 700; font-size: 11.5px; line-height: 1.2; text-align: left; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; padding-left: 5px; padding-right: 6px; }
+        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; flex-shrink: 0; padding-right: 4px; }
         .barcode-wrap { margin-top: 4px; display: flex; justify-content: center; width: 100%; }
         svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
         @media print {
@@ -366,8 +366,8 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                   </div>
                 )}
 
-                {/* Second row: Product Name & Price */}
-                <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-1 mb-1.5 px-0.5">
+                {/* Second row: Product Name & Price (clean breathing space, no underline) */}
+                <div className="label-header-row flex items-baseline justify-between w-full mb-1.5 pl-3 pr-2">
                   <span className="product-name text-[12px] font-bold text-black text-left truncate max-w-[130px]">
                     {productName}
                   </span>
@@ -393,8 +393,8 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                   {productCode ? (
                     <Barcode
                       value={productCode}
-                      height={normalSize === '50x25' ? 38 : 48}
-                      width={2.2}
+                      height={normalSize === '50x25' ? 42 : 56}
+                      width={2.4}
                       fontSize={13}
                       margin={0}
                       displayValue={true}

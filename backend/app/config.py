@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     CURRENCY_CODE: str = "INR"
 
     class Config:
-        import sys, os
+        import sys
         from pathlib import Path
         # Look in sys._MEIPASS (PyInstaller bundle), executable directory, backend dir, or current dir
         _search_dirs = [
