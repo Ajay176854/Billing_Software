@@ -209,87 +209,70 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Live Thermal Label Preview</span>
 
             {labelSize === '14x100' ? (
-              /* Specialized Seznik 14.3mm x 100mm Jewellery Dumbbell Tag Preview */
-              <div
-                ref={printRef}
-                className="w-[140px] flex flex-col items-center py-2 px-2 bg-white border-2 border-dashed border-amber-300 rounded-lg shadow-xs"
-              >
-                {/* Flap 1: Front Face (Brand, Item, Price & Barcode) */}
-                <div className="w-full px-2 py-2 border border-amber-200 bg-amber-50/50 rounded-md flex flex-col items-center text-center">
-                  <span className="text-[8px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/80 px-1.5 py-0.5 rounded mb-1">
-                    Front Flap
-                  </span>
-                  {showStoreHeader && (
-                    <div className="text-[11px] font-black text-black leading-tight uppercase truncate max-w-full">
-                      {storeName}
-                    </div>
-                  )}
-                  <div className="text-[10px] font-semibold text-gray-800 leading-tight mt-0.5 truncate max-w-full">
-                    {productName}
-                  </div>
-                  {showPrice && price !== undefined && (
-                    <div className="text-[12px] font-extrabold text-emerald-700 mt-1">
-                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </div>
-                  )}
-                  <div className="barcode-wrap flex justify-center w-full mt-1.5 overflow-hidden">
-                    {productCode ? (
-                      <Barcode
-                        value={productCode}
-                        height={22}
-                        width={1.0}
-                        fontSize={8.5}
-                        margin={0}
-                        displayValue={true}
-                        background="transparent"
-                      />
-                    ) : (
-                      <span className="text-[8px] text-gray-400">No Barcode</span>
-                    )}
-                  </div>
+              /* Specialized Seznik 14.3mm x 100mm 3-Up Jewellery Dumbbell Tags Preview */
+              <div className="flex flex-col items-center w-full">
+                <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1 bg-amber-100/70 border border-amber-300 rounded-full text-amber-900 text-[10px] font-bold">
+                  <span>✨ 3-Up Roll: 3 Stickers Print Simultaneously in Each Row (Zero Paper Waste)</span>
                 </div>
+                <div
+                  ref={printRef}
+                  className="w-full flex justify-center items-start gap-2 py-2 px-2 bg-slate-100/60 border-2 border-dashed border-amber-300 rounded-xl overflow-x-auto"
+                >
+                  {[0, 1, 2].map((idx) => (
+                    <div
+                      key={idx}
+                      className="w-[110px] shrink-0 flex flex-col items-center py-1.5 px-1 bg-white border border-amber-200 rounded-lg shadow-xs"
+                    >
+                      {/* Flap 1: Front Face (Brand, Item, Price & Barcode) */}
+                      <div className="w-full px-1.5 py-1.5 border border-amber-200 bg-amber-50/40 rounded-md flex flex-col items-center text-center">
+                        <span className="text-[7.5px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/70 px-1 py-0.2 rounded mb-0.5">
+                          {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
+                        </span>
+                        {showStoreHeader && (
+                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
+                            {storeName}
+                          </div>
+                        )}
+                        <div className="text-[9px] font-bold text-gray-800 leading-tight mt-0.5 max-w-full break-words">
+                          {productName}
+                        </div>
+                        {showPrice && price !== undefined && (
+                          <div className="text-[10.5px] font-extrabold text-emerald-700 mt-0.5">
+                            {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </div>
+                        )}
+                        <div className="barcode-wrap flex justify-center w-full mt-1 overflow-hidden">
+                          {productCode ? (
+                            <Barcode
+                              value={productCode}
+                              height={18}
+                              width={0.9}
+                              fontSize={8}
+                              margin={0}
+                              displayValue={true}
+                              background="transparent"
+                            />
+                          ) : (
+                            <span className="text-[7.5px] text-gray-400">No Barcode</span>
+                          )}
+                        </div>
+                      </div>
 
-                {/* Middle Tail: Looping Strap (Wraps around jewellery) */}
-                <div className="w-[20px] h-16 my-1 border-x-2 border-dashed border-amber-300 bg-amber-50/20 flex items-center justify-center relative">
-                  <span className="text-[7.5px] font-bold text-amber-600 rotate-90 whitespace-nowrap tracking-wider uppercase">
-                    Loop Strap
-                  </span>
-                </div>
+                      {/* Middle Tail: Looping Strap (Wraps around jewellery) */}
+                      <div className="w-[14px] h-12 my-1 border-x border-dashed border-amber-300 bg-amber-50/20 flex items-center justify-center relative">
+                        <span className="text-[6.5px] font-bold text-amber-600 rotate-90 whitespace-nowrap tracking-wider uppercase">
+                          Strap
+                        </span>
+                      </div>
 
-                {/* Flap 2: Back Face (Matching details when folded) */}
-                <div className="w-full px-2 py-2 border border-amber-200 bg-amber-50/50 rounded-md flex flex-col items-center text-center">
-                  <span className="text-[8px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/80 px-1.5 py-0.5 rounded mb-1">
-                    Back Flap
-                  </span>
-                  {showStoreHeader && (
-                    <div className="text-[11px] font-black text-black leading-tight uppercase truncate max-w-full">
-                      {storeName}
+                      {/* Flap 2: Fold-Over Backing (Folds behind Front Flap) */}
+                      <div className="w-full px-1 py-2 border border-dashed border-gray-200 bg-gray-50/50 rounded-md flex flex-col items-center justify-center text-center">
+                        <span className="text-[7px] text-gray-400 font-medium">
+                          Blank Fold-Over
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  <div className="text-[10px] font-semibold text-gray-800 leading-tight mt-0.5 truncate max-w-full">
-                    {productName}
-                  </div>
-                  {showPrice && price !== undefined && (
-                    <div className="text-[12px] font-extrabold text-emerald-700 mt-1">
-                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </div>
-                  )}
-                  <div className="barcode-wrap flex justify-center w-full mt-1.5 overflow-hidden">
-                    {productCode ? (
-                      <Barcode
-                        value={productCode}
-                        height={22}
-                        width={1.0}
-                        fontSize={8.5}
-                        margin={0}
-                        displayValue={true}
-                        background="transparent"
-                      />
-                    ) : (
-                      <span className="text-[8px] text-gray-400">No Barcode</span>
-                    )}
-                  </div>
-                  <span className="text-[7.5px] text-gray-400 mt-0.5">Folds back-to-back</span>
+                  ))}
                 </div>
               </div>
             ) : (

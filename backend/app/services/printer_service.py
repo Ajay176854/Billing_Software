@@ -85,62 +85,93 @@ def build_tspl_label(
         "CLS",
     ]
 
-    # Special handling for Seznik 14.3mm x 100mm Jewellery Dumbbell / Tail Tag
+    # Special handling for Seznik 14.3mm x 100mm Jewellery Dumbbell Tag (3-Up Multi-Column Roll)
+    # The roll consists of 3 horizontal dumbbell tags side-by-side across a ~50mm web (each tag is 14.3mm x 100mm).
     if width_mm <= 20 and height_mm >= 70:
-        # At 203 DPI: 14.3mm is ~114 dots wide, 100mm is 800 dots long
-        # Head 1 (Front Flap): Y = 0 to 240 dots (0mm to 30mm)
-        # Middle Tail (Loop Strap): Y = 240 to 580 dots (30mm to 72.5mm) - completely blank!
-        # Head 2 (Back Flap): Y = 580 to 800 dots (72.5mm to 100mm)
+        import math
+
+        # Total printable width is 48-50mm (384 dots at 203 DPI)
+        # 3 horizontal columns across the roll:
+        # Col 0 (Left): X = 8 to 122 (Center = 65)
+        # Col 1 (Center): X = 135 to 249 (Center = 192)
+        # Col 2 (Right): X = 262 to 376 (Center = 319)
+        col_starts = [8, 135, 262]
+        CHAR_W = 10
+        LABEL_W = 114
+
         lines = [
-            "SIZE 15 mm, 100 mm",
+            "SIZE 50 mm, 100 mm",
             "GAP 2 mm, 0 mm",
             "DIRECTION 0",
             "DENSITY 11",
             "CLS",
         ]
+
+        # Clean store name (max 10 chars)
+        clean_store = (store_name or "").strip().replace('"', "")[:10]
+
+        # Clean product name - wrap into max 10 chars per line (up to 2 lines)
+        clean_name = product_name.strip().replace('"', "")
+        words = clean_name.split()
+        name_lines = []
+        buf = ""
+        for w in words:
+            if not buf:
+                buf = w[:10]
+            elif len(buf) + 1 + len(w) <= 10:
+                buf += " " + w
+            else:
+                name_lines.append(buf[:10])
+                buf = w[:10]
+        if buf:
+            name_lines.append(buf[:10])
+        name_lines = name_lines[:2]
+
+        # Format price to fit comfortably within 10 chars
         price_str = ""
         if show_price and price is not None:
-            price_str = f"Rs.{price:,.0f}/-" if price == int(price) else f"Rs.{price:,.2f}/-"
+            p_val = int(price) if price == int(price) else price
+            price_str = f"Rs.{p_val:,}" if isinstance(p_val, int) else f"Rs.{p_val:,.2f}"
+            if len(price_str) > 10:
+                price_str = f"Rs.{int(price)}"[:10]
 
-        clean_store = (store_name or "MOIRA LUXE")[:12].replace('"', '').strip()
-        clean_name = product_name[:13].replace('"', '').strip()
-        clean_code = str(barcode or "").strip().replace('"', '')[:10]
+        clean_code = str(barcode or "").strip().replace('"', "")[:10]
 
-        def get_center_x(txt: str, char_w: int = 8) -> int:
-            return max(4, int((114 - (len(txt) * char_w)) / 2))
+        # Print all 3 horizontal stickers in the row simultaneously so no sticker is wasted
+        for col_idx in range(3):
+            col_x = col_starts[col_idx]
 
-        # --- FLAP 1 (Front Face: 0mm - 30mm = Y: 0 - 240 dots) ---
-        if show_header and clean_store:
-            lines.append(f'TEXT {get_center_x(clean_store, 8)},20,"1",0,1,1,"{clean_store}"')
+            def get_x(txt: str, char_w: int = CHAR_W) -> int:
+                w = len(txt) * char_w
+                return col_x + max(2, int((LABEL_W - w) / 2))
 
-        if clean_name:
-            lines.append(f'TEXT {get_center_x(clean_name, 8)},46,"1",0,1,1,"{clean_name}"')
+            curr_y = 20
 
-        if show_price and price_str:
-            lines.append(f'TEXT {get_center_x(price_str, 9)},74,"2",0,1,1,"{price_str}"')
+            # 1. Store Header (if enabled)
+            if show_header and clean_store:
+                lines.append(f'TEXT {get_x(clean_store)},{curr_y},"1",0,1,1,"{clean_store}"')
+                curr_y += 24
 
-        if clean_code:
-            lines.append(f'BARCODE 12,110,"128",30,0,0,1,2,"{clean_code}"')
-            lines.append(f'TEXT {get_center_x(clean_code, 8)},150,"1",0,1,1,"{clean_code}"')
+            # 2. Product Name (wrapped, max 2 lines)
+            for nline in name_lines:
+                lines.append(f'TEXT {get_x(nline)},{curr_y},"1",0,1,1,"{nline}"')
+                curr_y += 24
 
-        # --- MIDDLE TAIL: 30mm - 70mm (Blank loop strap that wraps through ring/jewellery) ---
+            # 3. Price
+            if show_price and price_str:
+                lines.append(f'TEXT {get_x(price_str)},{curr_y},"1",0,1,1,"{price_str}"')
+                curr_y += 26
 
-        # --- FLAP 2 (Back Face: 70mm - 100mm = Y: 580 - 800 dots) ---
-        # When folded back-to-back, reverse side displays matching details
-        if show_header and clean_store:
-            lines.append(f'TEXT {get_center_x(clean_store, 8)},600,"1",0,1,1,"{clean_store}"')
+            # 4. Barcode & Human-readable code
+            if clean_code:
+                bc_x = col_x + max(4, int((LABEL_W - (len(clean_code) * 9 + 6)) / 2))
+                lines.append(f'BARCODE {bc_x},{curr_y},"128",28,0,0,1,2,"{clean_code}"')
+                curr_y += 32
+                lines.append(f'TEXT {get_x(clean_code)},{curr_y},"1",0,1,1,"{clean_code}"')
 
-        if clean_name:
-            lines.append(f'TEXT {get_center_x(clean_name, 8)},626,"1",0,1,1,"{clean_name}"')
-
-        if show_price and price_str:
-            lines.append(f'TEXT {get_center_x(price_str, 9)},654,"2",0,1,1,"{price_str}"')
-
-        if clean_code:
-            lines.append(f'BARCODE 12,690,"128",30,0,0,1,2,"{clean_code}"')
-            lines.append(f'TEXT {get_center_x(clean_code, 8)},730,"1",0,1,1,"{clean_code}"')
-
-        lines.append(f"PRINT {max(1, copies)}")
+        # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
+        rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
+        lines.append(f"PRINT {rows_to_print}")
         lines.append("")
         return "\r\n".join(lines).encode("ascii", errors="replace")
 
