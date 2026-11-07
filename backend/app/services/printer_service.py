@@ -91,13 +91,13 @@ def build_tspl_label(
         import math
 
         # Total printable width is 48-50mm (384 dots at 203 DPI)
-        # 3 horizontal columns across the roll:
-        # Col 0 (Left): X = 8 to 122 (Center = 65)
-        # Col 1 (Center): X = 135 to 249 (Center = 192)
-        # Col 2 (Right): X = 262 to 376 (Center = 319)
-        col_starts = [8, 135, 262]
+        # Measured Seznik 3-Up physical track layout:
+        # Col 0 (Left):   X = 1 to 105 (Center = 53)
+        # Col 1 (Center): X = 139 to 243 (Center = 191)
+        # Col 2 (Right):  X = 278 to 382 (Center = 330)
+        col_starts = [1, 139, 278]
         CHAR_W = 10
-        LABEL_W = 114
+        LABEL_W = 104
 
         lines = [
             "SIZE 50 mm, 100 mm",
