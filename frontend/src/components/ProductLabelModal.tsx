@@ -223,29 +223,35 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                       key={idx}
                       className="w-[110px] shrink-0 flex flex-col items-center py-1.5 px-1 bg-white border border-amber-200 rounded-lg shadow-xs"
                     >
-                      {/* Flap 1: Front Face (Brand, Item, Price & Barcode) */}
+                      {/* Flap 1: Front Face with 2 Distinct Sections */}
                       <div className="w-full px-1.5 py-1.5 border border-amber-200 bg-amber-50/40 rounded-md flex flex-col items-center text-center">
                         <span className="text-[7.5px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/70 px-1 py-0.2 rounded mb-0.5">
                           {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
                         </span>
-                        {showStoreHeader && (
-                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
-                            {storeName}
+
+                        {/* Part 1: Brand, Product Name & Price */}
+                        <div className="w-full py-1 border-b border-dashed border-amber-300/80 mb-1">
+                          {showStoreHeader && (
+                            <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
+                              {storeName}
+                            </div>
+                          )}
+                          <div className="text-[9px] font-bold text-gray-800 leading-tight mt-0.5 max-w-full break-words">
+                            {productName}
                           </div>
-                        )}
-                        <div className="text-[9px] font-bold text-gray-800 leading-tight mt-0.5 max-w-full break-words">
-                          {productName}
+                          {showPrice && price !== undefined && (
+                            <div className="text-[10.5px] font-extrabold text-emerald-700 mt-0.5">
+                              {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
                         </div>
-                        {showPrice && price !== undefined && (
-                          <div className="text-[10.5px] font-extrabold text-emerald-700 mt-0.5">
-                            {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                          </div>
-                        )}
-                        <div className="barcode-wrap flex justify-center w-full mt-1 overflow-hidden">
+
+                        {/* Part 2: Barcode Tag Format */}
+                        <div className="barcode-wrap flex flex-col items-center justify-center w-full py-0.5 overflow-hidden">
                           {productCode ? (
                             <Barcode
                               value={productCode}
-                              height={18}
+                              height={26}
                               width={0.9}
                               fontSize={8}
                               margin={0}
