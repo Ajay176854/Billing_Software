@@ -300,7 +300,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                           </div>
                           {showPrice && price !== undefined && (
                             <div className="text-[9.5px] font-extrabold text-emerald-700 mt-0.5">
-                              Rs. {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
+                              {currencySymbol} {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
                             </div>
                           )}
                         </div>
@@ -373,7 +373,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
 
                   {showPrice && price !== undefined && (
                     <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
-                      Rs. {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
+                      {currencySymbol} {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
                     </span>
                   )}
                 </div>
