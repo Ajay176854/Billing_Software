@@ -166,10 +166,11 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           padding: ${isTagging ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
           page-break-after: always;
         }
-        .label-header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px; padding-bottom: 1px; }
-        .store-header { font-size: 13.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; width: 100%; margin-top: 2px; margin-bottom: 4px; }
-        .product-name { font-weight: 700; font-size: 11.5px; line-height: 1.2; text-align: left; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; padding-left: 5px; padding-right: 6px; }
-        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; flex-shrink: 0; padding-right: 4px; }
+        .label-header-row { display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 2px; }
+        .store-header { font-size: 13px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; text-align: left; }
+        .price-tag { font-size: 13px; font-weight: 800; white-space: nowrap; text-align: right; margin-left: auto; }
+        .product-name-row { width: 100%; text-align: left; margin-bottom: 2px; }
+        .product-name { font-weight: 700; font-size: 11.5px; line-height: 1.2; text-align: left; width: 100%; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .barcode-wrap { margin-top: 4px; display: flex; justify-content: center; width: 100%; }
         svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
         @media print {
@@ -359,24 +360,26 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 }}
                 className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-9 px-3 pb-3 flex flex-col items-center justify-start text-center shadow-xs"
               >
-                {/* Store Header centered in the middle */}
-                {showStoreHeader && (
-                  <div className="store-header text-[14px] font-extrabold tracking-wider text-black text-center w-full mt-1 mb-1.5">
-                    {storeName}
-                  </div>
-                )}
-
-                {/* Second row: Product Name & Price (clean breathing space, no underline) */}
-                <div className="label-header-row flex items-baseline justify-between w-full mb-1.5 pl-3 pr-2">
-                  <span className="product-name text-[12px] font-bold text-black text-left truncate max-w-[130px]">
-                    {productName}
-                  </span>
+                {/* Row 1: Store Name on left & Price on top right corner */}
+                <div className="label-header-row flex items-baseline justify-between w-full mb-1 pl-1 pr-1">
+                  {showStoreHeader ? (
+                    <span className="store-header text-[13px] font-extrabold tracking-wider text-black uppercase text-left">
+                      {storeName}
+                    </span>
+                  ) : <div />}
 
                   {showPrice && price !== undefined && (
-                    <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
+                    <span className="price-tag text-[13px] font-black text-black tracking-tight whitespace-nowrap ml-auto">
                       {currencySymbol} {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
                     </span>
                   )}
+                </div>
+
+                {/* Row 2: Full-width Product Name (up to 26+ characters) */}
+                <div className="product-name-row w-full text-left mb-1 pl-1 pr-1">
+                  <span className="product-name text-[12px] font-bold text-black block truncate">
+                    {productName}
+                  </span>
                 </div>
 
                 {showQr && (

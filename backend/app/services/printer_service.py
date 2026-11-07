@@ -173,8 +173,8 @@ def build_tspl_label(
         "CLS",
     ]
 
-    # Top breathing space (shifted down to prevent top clipping and balance bottom margin)
-    top_y = 48 if norm_h >= 30 else 32
+    # Top breathing space
+    top_y = 38 if norm_h >= 30 else 26
 
     # Price string formatting — formatted with Rs. prefix and /- suffix (e.g. Rs. 98/-)
     price_str = ""
@@ -188,57 +188,52 @@ def build_tspl_label(
         except Exception:
             price_str = f"Rs. {price}/-"
 
-    # Header: Store Name centered in the middle with bold Font 4
-    if show_header and store_name:
-        clean_store = store_name.replace('"', '').strip()
-        store_w = len(clean_store) * 24
-        store_x = max(10, int(((norm_w * 8) - store_w) / 2))
-        lines.append(f'TEXT {store_x},{top_y},"4",0,1,1,"{clean_store}"')
-        prod_y = top_y + (38 if norm_h >= 30 else 30)
-    else:
-        prod_y = top_y + (20 if norm_h >= 30 else 12)
-
-    # Line 2: Product Name on left (with left margin space) and Price on right
-    # DEV 632-L58P thermal head is 384 dots max (48mm). Safe right margin is 350 dots.
+    # Safe horizontal margins: 35 dots on left, 350 dots on right (DEV 632-L58P 384 dot head)
     left_margin = 35
     safe_right = min(350, int((norm_w * 8) - 25))
+
+    # Row 1: Store Name on left & Price on Top Right Corner
+    if show_header and store_name:
+        clean_store = store_name.replace('"', '').strip()
+        lines.append(f'TEXT {left_margin},{top_y},"3",0,1,1,"{clean_store}"')
+
     if show_price and price_str:
-        # Font 2 is 12x20 dots per char
-        price_w = len(price_str) * 12
+        # Font 3 (16x24 dots per char) for clear, bold top-right price display
+        price_w = len(price_str) * 16
         price_x = max(180, safe_right - price_w)
-        # Allocate remaining space for product name with safe gap before price
-        avail_dots = max(50, price_x - left_margin - 15)
-        max_chars = int(avail_dots / 12)
-        clean_name = product_name[:max_chars].replace('"', '').strip()
-        lines.append(f'TEXT {left_margin},{prod_y},"2",0,1,1,"{clean_name}"')
-        lines.append(f'TEXT {price_x},{prod_y},"2",0,1,1,"{price_str}"')
+        lines.append(f'TEXT {price_x},{top_y},"3",0,1,1,"{price_str}"')
+
+    # Row 2: Full-Width Product Name (increased character capacity up to 26+ characters)
+    prod_y = top_y + (34 if norm_h >= 30 else 28)
+    clean_raw_name = product_name.replace('"', '').strip()
+    if len(clean_raw_name) > 26:
+        # Extra long product names use Font 1 (8x12 dots) fitting up to 38 characters
+        clean_name = clean_raw_name[:38]
+        lines.append(f'TEXT {left_margin},{prod_y},"1",0,1,1,"{clean_name}"')
     else:
-        avail_dots = max(80, safe_right - left_margin)
-        max_chars = int(avail_dots / 12)
-        clean_name = product_name[:max_chars].replace('"', '').strip()
+        # Standard names up to 26 characters in bold Font 2 (12x20 dots)
+        clean_name = clean_raw_name[:26]
         lines.append(f'TEXT {left_margin},{prod_y},"2",0,1,1,"{clean_name}"')
 
-    # Line 3: Expanded Barcode or QR Code (no underline divider)
-    barcode_y = prod_y + (30 if norm_h >= 30 else 26)
-    barcode_h = 58 if norm_h >= 30 else 42
+    # Row 3: Enlarged Barcode or QR Code (centered with comfortable left & right breathing space)
+    print_w = min(384, int(norm_w * 8))
+    barcode_y = prod_y + (30 if norm_h >= 30 else 24)
+    barcode_h = 66 if norm_h >= 30 else 46
     if barcode:
         clean_code = str(barcode).strip().replace('"', '')
         if show_qr:
-            qr_w = 84
-            qr_x = max(15, int(((norm_w * 8) - qr_w) / 2))
+            qr_w = 96
+            qr_x = max(15, int((print_w - qr_w) / 2))
             lines.append(f'QRCODE {qr_x},{barcode_y},M,4,A,0,"{clean_code}"')
         else:
             # Code 128 total module count: start(11) + data(len*11) + check(11) + stop(13) = len*11 + 35
             tot_modules = len(clean_code) * 11 + 35
-            # Expand to wide module (narrow=3, wide=6) if it fits within safe label width (~355 dots)
-            if tot_modules * 3 <= min(355, int((norm_w * 8) - 25)):
-                narrow = 3
-                wide = 6
-            else:
-                narrow = 2
-                wide = 5
+            # Module width 2 with wide=5 expands the bar thickness and increases size
+            narrow = 2
+            wide = 5
             bc_w = tot_modules * narrow
-            bc_x = max(15, int(((norm_w * 8) - bc_w) / 2))
+            # Centered with comfortable left space (~65 dots = ~8.1 mm)
+            bc_x = max(35, int((print_w - bc_w) / 2) - 15)
             lines.append(f'BARCODE {bc_x},{barcode_y},"128",{barcode_h},1,0,{narrow},{wide},"{clean_code}"')
 
     lines.append(f"PRINT {max(1, copies)}")
