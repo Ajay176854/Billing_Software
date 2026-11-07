@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, X, Zap } from 'lucide-react';
+import { Printer, X, Zap, Tag, Sparkles } from 'lucide-react';
 import api from '../api/client';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -16,6 +16,7 @@ interface ProductLabelModalProps {
 }
 
 export type LabelLayout = '50x30' | '50x25' | '40x30' | '14x100' | 'standard';
+export type LabelMode = 'normal' | 'tagging';
 
 const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   isOpen,
@@ -26,10 +27,28 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   currencySymbol = '₹',
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
-  const [labelSize, setLabelSize] = useState<LabelLayout>('50x30');
+  
+  // Section Mode: 'normal' (Standard Box/Product Sticker) or 'tagging' (Jewellery Dumbbell 3-Up Tag)
+  const [labelMode, setLabelMode] = useState<LabelMode>(() => {
+    const saved = localStorage.getItem('label_mode');
+    if (saved === 'tagging' || saved === 'normal') return saved;
+    const oldSize = localStorage.getItem('hardware_label_size');
+    return oldSize === '14x100' ? 'tagging' : 'normal';
+  });
+
+  const [normalSize, setNormalSize] = useState<'50x30' | '50x25' | '40x30'>(() => {
+    const saved = localStorage.getItem('hardware_normal_size');
+    return saved === '50x25' || saved === '40x30' ? saved : '50x30';
+  });
+
+  const [tagDetails, setTagDetails] = useState(() => {
+    return localStorage.getItem('last_tag_details') || 'wt. 2.5gm';
+  });
+
   const [showPrice, setShowPrice] = useState(true);
   const [showQr, setShowQr] = useState(false);
   const [showStoreHeader, setShowStoreHeader] = useState(true);
+  const [showTagDetails, setShowTagDetails] = useState(true);
   const [copies, setCopies] = useState(1);
   const [storeName, setStoreName] = useState(() => {
     return localStorage.getItem('store_name') || 'MOIRA LUXE';
@@ -37,9 +56,6 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   const [printingDirect, setPrintingDirect] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('hardware_label_size') as LabelLayout;
-    if (saved) setLabelSize(saved);
-
     // Fetch dynamic store name from settings
     api.get('/settings/store-profile').then(res => {
       if (res.data?.store_name) {
@@ -51,48 +67,51 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isTagging = labelMode === 'tagging';
+
   // Direct USB RAW TSPL printing (instantly prints directly to printer without any browser popup)
   const handleDirectPrint = async () => {
     setPrintingDirect(true);
     try {
-      const dimensions = labelSize === '14x100'
+      const dimensions = isTagging
         ? { width: 14.3, height: 100 }
-        : labelSize === '50x25'
+        : normalSize === '50x25'
           ? { width: 50, height: 25 }
-          : labelSize === '40x30'
+          : normalSize === '40x30'
             ? { width: 40, height: 30 }
             : { width: 50, height: 30 };
+
+      const payload = {
+        product_name: productName,
+        barcode: productCode,
+        price: showPrice ? price : undefined,
+        store_name: isTagging ? (showTagDetails ? tagDetails : '') : (showStoreHeader ? storeName : ''),
+        tag_details: isTagging ? (showTagDetails ? tagDetails : '') : undefined,
+        copies: copies,
+        width_mm: dimensions.width,
+        height_mm: dimensions.height,
+        label_type: labelMode,
+        show_price: showPrice,
+        show_header: isTagging ? showTagDetails : showStoreHeader,
+      };
 
       // Send directly to local FastAPI server via configured api client
       let res;
       try {
-        res = await api.post('/printer/print-label', {
-          product_name: productName,
-          barcode: productCode,
-          price: showPrice ? price : undefined,
-          store_name: showStoreHeader ? storeName : '',
-          copies: copies,
-          width_mm: dimensions.width,
-          height_mm: dimensions.height,
-          show_price: showPrice,
-          show_header: showStoreHeader,
-        });
+        res = await api.post('/printer/print-label', payload);
       } catch {
-        res = await axios.post('http://127.0.0.1:8000/api/printer/print-label', {
-          product_name: productName,
-          barcode: productCode,
-          price: showPrice ? price : undefined,
-          store_name: showStoreHeader ? storeName : '',
-          copies: copies,
-          width_mm: dimensions.width,
-          height_mm: dimensions.height,
-          show_price: showPrice,
-          show_header: showStoreHeader,
-        });
+        res = await axios.post('http://127.0.0.1:8000/api/printer/print-label', payload);
       }
 
-      toast.success(res.data?.message || `Printed ${copies} label(s) directly to DEV 632-L58P!`);
-      localStorage.setItem('hardware_label_size', labelSize);
+      toast.success(res.data?.message || `Printed ${copies} ${isTagging ? 'tag' : 'label'}(s) directly to DEV 632-L58P!`);
+      localStorage.setItem('label_mode', labelMode);
+      if (isTagging) {
+        localStorage.setItem('last_tag_details', tagDetails);
+        localStorage.setItem('hardware_label_size', '14x100');
+      } else {
+        localStorage.setItem('hardware_normal_size', normalSize);
+        localStorage.setItem('hardware_label_size', normalSize);
+      }
       onClose();
     } catch (err: any) {
       console.error("Direct hardware print error:", err);
@@ -105,10 +124,12 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   // Browser Print Preview Fallback
   const handleBrowserPrint = () => {
     if (!printRef.current) return;
-    localStorage.setItem('hardware_label_size', labelSize);
+    localStorage.setItem('label_mode', labelMode);
 
     let combinedLabelsHtml = '';
-    for (let i = 0; i < Math.max(1, copies); i++) {
+    const printIterations = isTagging ? Math.max(1, Math.ceil(copies / 3)) : Math.max(1, copies);
+
+    for (let i = 0; i < printIterations; i++) {
       combinedLabelsHtml += `
         <div class="label-page">
           ${printRef.current.innerHTML}
@@ -141,14 +162,14 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           color: #000;
         }
         .label-page {
-          width: ${labelSize === '14x100' ? '14.3mm' : '50mm'};
-          min-height: ${labelSize === '14x100' ? '100mm' : '30mm'};
+          width: ${isTagging ? '50mm' : '50mm'};
+          min-height: ${isTagging ? '100mm' : '30mm'};
           margin: 0 auto;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: ${labelSize === '14x100' ? 'space-between' : 'flex-start'};
-          padding: ${labelSize === '14x100' ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
+          justify-content: ${isTagging ? 'flex-start' : 'flex-start'};
+          padding: ${isTagging ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
           page-break-after: always;
         }
         .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 4px; padding-bottom: 2px; }
@@ -160,14 +181,14 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
         @media print {
           @page { 
             margin: 0; 
-            size: ${labelSize === '14x100' ? '14.3mm 100mm' : labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
+            size: ${isTagging ? '50mm 100mm' : normalSize === '50x25' ? '50mm 25mm' : normalSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
           }
           body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .label-page { 
             border: none !important; 
             width: 100%; 
             height: 100%; 
-            padding: ${labelSize === '14x100' ? '1mm 0.5mm !important' : (labelSize === '50x25' ? '6.5mm' : '8mm') + ' 1.5mm 1.5mm 1.5mm !important'}; 
+            padding: ${isTagging ? '1mm 0.5mm !important' : (normalSize === '50x25' ? '6.5mm' : '8mm') + ' 1.5mm 1.5mm 1.5mm !important'}; 
           }
         }
       `);
@@ -194,64 +215,117 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           <div>
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Printer className="w-5 h-5 text-indigo-600" />
-              DEV 632-L58P Direct Label Print
+              Thermal Label Printing
             </h2>
-            <p className="text-xs text-gray-500">Instant direct thermal hardware printing</p>
+            <p className="text-xs text-gray-500">Direct hardware print to DEV 632-L58P / Xprinter</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Section Selector: Normal Label vs Tagging Label */}
+        <div className="px-6 pt-4">
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setLabelMode('normal');
+                localStorage.setItem('label_mode', 'normal');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                labelMode === 'normal'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <Tag className="w-4 h-4" />
+              Normal Label
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLabelMode('tagging');
+                localStorage.setItem('label_mode', 'tagging');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                labelMode === 'tagging'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              Tagging Label
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 pt-3 space-y-5">
           {/* Label Preview Card */}
           <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Live Thermal Label Preview</span>
+            <div className="flex items-center justify-between w-full mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                {isTagging ? 'Jewellery Tagging Preview (Landscape 3-Up)' : 'Standard Normal Label Preview'}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                isTagging ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-indigo-100 text-indigo-800'
+              }`}>
+                {isTagging ? '14.3 × 100 mm (3-Up)' : `${normalSize} mm`}
+              </span>
+            </div>
 
-            {labelSize === '14x100' ? (
+            {isTagging ? (
               /* Specialized Seznik 14.3mm x 100mm 3-Up Jewellery Dumbbell Tags Preview */
               <div className="flex flex-col items-center w-full">
-                <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1 bg-amber-100/70 border border-amber-300 rounded-full text-amber-900 text-[10px] font-bold">
-                  <span>✨ 3-Up Roll: 3 Stickers Print Simultaneously in Each Row (Zero Paper Waste)</span>
+                <div className="flex items-center gap-1.5 mb-2.5 px-3 py-1 bg-amber-100/80 border border-amber-300 rounded-full text-amber-900 text-[10px] font-bold">
+                  <span>✨ 3-Up Roll: 3 Stickers Print Simultaneously in Landscape Across the Roll</span>
                 </div>
                 <div
                   ref={printRef}
-                  className="w-full flex justify-center items-start gap-2 py-2 px-2 bg-slate-100/60 border-2 border-dashed border-amber-300 rounded-xl overflow-x-auto"
+                  className="w-full flex justify-center items-start gap-2.5 py-2 px-2 bg-slate-100/70 border-2 border-dashed border-amber-300 rounded-xl overflow-x-auto"
                 >
                   {[0, 1, 2].map((idx) => (
                     <div
                       key={idx}
-                      className="w-[110px] shrink-0 flex flex-col items-center py-1.5 px-1 bg-white border border-amber-200 rounded-lg shadow-xs"
+                      className="w-[122px] shrink-0 flex flex-col items-center bg-white border border-amber-300 rounded-lg shadow-xs overflow-hidden"
                     >
-                      {/* Flap 1: Front Face with 2 Distinct Sections */}
-                      <div className="w-full px-1.5 py-1.5 border border-amber-200 bg-amber-50/40 rounded-md flex flex-col items-center text-center">
-                        <span className="text-[7.5px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/70 px-1 py-0.2 rounded mb-0.5">
+                      {/* Flap: Divided into Front Face and Back Face with Solid Center Divider | */}
+                      <div className="w-full bg-amber-50/40 p-1.5 flex flex-col items-center">
+                        <span className="text-[7.5px] uppercase tracking-wider text-amber-900 font-bold bg-amber-200/80 px-1.5 py-0.2 rounded mb-1">
                           {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
                         </span>
 
-                        {/* Part 1: Product Name, Brand & Price */}
-                        <div className="w-full py-1 border-b-2 border-dashed border-amber-300 mb-1">
-                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate max-w-full">
+                        {/* Part 1: Front Face Details (Product Name, Weight/Tag Detail, Price) */}
+                        <div className="w-full text-center py-0.5">
+                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate">
                             {productName}
                           </div>
-                          {showStoreHeader && (
-                            <div className="text-[8.5px] font-semibold text-gray-600 leading-tight mt-0.5 truncate max-w-full">
-                              {storeName}
+                          {showTagDetails && (tagDetails || storeName) && (
+                            <div className="text-[8px] font-bold text-gray-700 leading-tight mt-0.5 truncate">
+                              {tagDetails || storeName}
                             </div>
                           )}
                           {showPrice && price !== undefined && (
-                            <div className="text-[10px] font-extrabold text-emerald-700 mt-0.5">
+                            <div className="text-[9.5px] font-extrabold text-emerald-700 mt-0.5">
                               {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                             </div>
                           )}
                         </div>
 
-                        {/* Part 2: Barcode Tag Format */}
+                        {/* Solid Middle Divider Line | */}
+                        <div className="w-full my-1 relative flex items-center justify-center">
+                          <div className="w-full border-t-2 border-amber-600" />
+                          <span className="absolute bg-white px-1 text-[7px] font-bold text-amber-800 border border-amber-300 rounded-xs">
+                            Fold |
+                          </span>
+                        </div>
+
+                        {/* Part 2: Back Face Barcode (Starts after the middle line) */}
                         <div className="barcode-wrap flex flex-col items-center justify-center w-full py-0.5 overflow-hidden">
                           {productCode ? (
                             <Barcode
                               value={productCode}
-                              height={26}
+                              height={24}
                               width={0.9}
                               fontSize={8}
                               margin={0}
@@ -264,15 +338,15 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Middle Tail: Looping Strap (Wraps around jewellery) */}
-                      <div className="w-[14px] h-12 my-1 border-x border-dashed border-amber-300 bg-amber-50/20 flex items-center justify-center relative">
-                        <span className="text-[6.5px] font-bold text-amber-600 rotate-90 whitespace-nowrap tracking-wider uppercase">
+                      {/* Middle Tail: Looping Strap */}
+                      <div className="w-[14px] h-8 my-1 border-x border-dashed border-amber-400 bg-amber-50/20 flex items-center justify-center relative">
+                        <span className="text-[6px] font-bold text-amber-700 rotate-90 whitespace-nowrap tracking-wider uppercase">
                           Strap
                         </span>
                       </div>
 
-                      {/* Flap 2: Fold-Over Backing (Folds behind Front Flap) */}
-                      <div className="w-full px-1 py-2 border border-dashed border-gray-200 bg-gray-50/50 rounded-md flex flex-col items-center justify-center text-center">
+                      {/* Flap 2: Fold-Over Tab */}
+                      <div className="w-full p-1 border-t border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center text-center">
                         <span className="text-[7px] text-gray-400 font-medium">
                           Blank Fold-Over
                         </span>
@@ -282,11 +356,12 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 </div>
               </div>
             ) : (
+              /* Standard Normal Label Preview */
               <div
                 ref={printRef}
                 style={{
-                  width: labelSize === '40x30' ? '180px' : '210px',
-                  minHeight: labelSize === '50x25' ? '110px' : '135px',
+                  width: normalSize === '40x30' ? '180px' : '210px',
+                  minHeight: normalSize === '50x25' ? '110px' : '135px',
                 }}
                 className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-9 px-3 pb-3 flex flex-col items-center justify-start text-center shadow-xs"
               >
@@ -324,7 +399,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                   {productCode ? (
                     <Barcode
                       value={productCode}
-                      height={labelSize === '50x25' ? 38 : 48}
+                      height={normalSize === '50x25' ? 38 : 48}
                       width={2.2}
                       fontSize={13}
                       margin={0}
@@ -339,69 +414,123 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             )}
           </div>
 
-          {/* Controls & Presets */}
-          <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl text-xs">
-            <div>
-              <label className="font-semibold text-gray-700 block mb-1.5">Label Size</label>
-              <select
-                value={labelSize}
-                onChange={(e) => setLabelSize(e.target.value as LabelLayout)}
-                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
-              >
-                <option value="50x30">50 × 30 mm (Standard Product Tag)</option>
-                <option value="50x25">50 × 25 mm (Compact)</option>
-                <option value="40x30">40 × 30 mm (Small Tag)</option>
-                <option value="14x100">14.3 × 100 mm (Seznik Jewellery Tag)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="font-semibold text-gray-700 block mb-1.5">Number of Labels</label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={copies}
-                onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
-              />
-            </div>
-
-            <div className="col-span-2 flex flex-wrap gap-4 pt-1">
-              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+          {/* Controls & Configuration */}
+          {isTagging ? (
+            /* Tagging Label Specific Controls */
+            <div className="grid grid-cols-2 gap-3 bg-amber-50/50 border border-amber-200/80 p-4 rounded-xl text-xs">
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1.5">Tag Details / Weight</label>
                 <input
-                  type="checkbox"
-                  checked={showPrice}
-                  onChange={(e) => setShowPrice(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-0"
+                  type="text"
+                  placeholder="e.g. wt. 2.5gm or Hallmarking"
+                  value={tagDetails}
+                  onChange={(e) => setTagDetails(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
                 />
-                Show MRP Price
-              </label>
+              </div>
 
-              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1.5">Quantity (Copies)</label>
                 <input
-                  type="checkbox"
-                  checked={showStoreHeader}
-                  onChange={(e) => setShowStoreHeader(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-0"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={copies}
+                  onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
                 />
-                Store Header
-              </label>
+              </div>
 
-              <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showQr}
-                  onChange={(e) => setShowQr(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-0"
-                />
-                Include QR Code
-              </label>
+              <div className="col-span-2 flex flex-wrap gap-4 pt-1">
+                <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showPrice}
+                    onChange={(e) => setShowPrice(e.target.checked)}
+                    className="rounded text-amber-600 focus:ring-0"
+                  />
+                  Show MRP Price
+                </label>
+
+                <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showTagDetails}
+                    onChange={(e) => setShowTagDetails(e.target.checked)}
+                    className="rounded text-amber-600 focus:ring-0"
+                  />
+                  Show Tag Details (Weight / Line 2)
+                </label>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Normal Label Specific Controls */
+            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl text-xs">
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1.5">Label Size</label>
+                <select
+                  value={normalSize}
+                  onChange={(e) => {
+                    const val = e.target.value as '50x30' | '50x25' | '40x30';
+                    setNormalSize(val);
+                    localStorage.setItem('hardware_normal_size', val);
+                  }}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
+                >
+                  <option value="50x30">50 × 30 mm (Standard Product Tag)</option>
+                  <option value="50x25">50 × 25 mm (Compact)</option>
+                  <option value="40x30">40 × 30 mm (Small Tag)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1.5">Number of Labels</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={copies}
+                  onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
+                />
+              </div>
+
+              <div className="col-span-2 flex flex-wrap gap-4 pt-1">
+                <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showPrice}
+                    onChange={(e) => setShowPrice(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-0"
+                  />
+                  Show MRP Price
+                </label>
+
+                <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showStoreHeader}
+                    onChange={(e) => setShowStoreHeader(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-0"
+                  />
+                  Store Header
+                </label>
+
+                <label className="flex items-center gap-1.5 text-gray-700 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showQr}
+                    onChange={(e) => setShowQr(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-0"
+                  />
+                  Include QR Code
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
-          <div className="flex justify-between items-center gap-3 pt-2">
+          <div className="flex justify-between items-center gap-3 pt-1">
             <button
               type="button"
               onClick={handleBrowserPrint}
@@ -423,7 +552,11 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 type="button"
                 disabled={printingDirect}
                 onClick={handleDirectPrint}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50"
+                className={`px-5 py-2.5 text-white rounded-xl shadow-lg transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50 ${
+                  isTagging
+                    ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 shadow-amber-600/25'
+                    : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 shadow-emerald-600/25'
+                }`}
               >
                 <Zap className="w-4 h-4 fill-current" />
                 {printingDirect ? 'Printing...' : `Direct (${copies})`}

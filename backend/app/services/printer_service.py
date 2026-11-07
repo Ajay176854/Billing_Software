@@ -72,22 +72,20 @@ def build_tspl_label(
     currency_symbol: str = "INR",
     show_price: bool = True,
     show_header: bool = True,
+    label_type: Optional[str] = None,
 ) -> bytes:
     """
     Generate standard TSPL command bytes with top breathing space to prevent printing over the top edge.
     Works natively on DEV 632-L58P, XP-235B, XP-245B, XP-365B, Seznik Josh/Tej label printers.
-    Supports standard labels (50x30, 50x25, 40x30) and Seznik 14.3mm x 100mm Jewellery Dumbbell tags.
+    Supports:
+    - Normal Label: Standard rectangular labels (50x30, 50x25, 40x30)
+    - Tagging Label: Seznik 14.3mm x 100mm Jewellery Dumbbell 3-Up tags (Landscape with middle divider |)
     """
-    lines = [
-        f"SIZE {width_mm} mm, {height_mm} mm",
-        "GAP 2 mm, 0 mm",
-        "DIRECTION 1",
-        "CLS",
-    ]
+    is_tagging = (label_type == "tagging") or (label_type != "normal" and width_mm <= 20 and height_mm >= 70)
 
     # Special handling for Seznik 14.3mm x 100mm Jewellery Dumbbell Tag (3-Up Multi-Column Roll)
     # The roll consists of 3 horizontal dumbbell tags side-by-side across a ~50mm web (each tag is 14.3mm x 100mm).
-    if width_mm <= 20 and height_mm >= 70:
+    if is_tagging:
         import math
 
         # Total printable width is 48-50mm (384 dots at 203 DPI)
@@ -157,8 +155,18 @@ def build_tspl_label(
         return "\r\n".join(lines).encode("ascii", errors="replace")
 
     # Standard rectangular label formatting (50x30, 50x25, 40x30)
+    norm_w = 50.0 if (width_mm <= 20 and height_mm >= 70) else width_mm
+    norm_h = 30.0 if (width_mm <= 20 and height_mm >= 70) else height_mm
+
+    lines = [
+        f"SIZE {norm_w} mm, {norm_h} mm",
+        "GAP 2 mm, 0 mm",
+        "DIRECTION 1",
+        "CLS",
+    ]
+
     # Top breathing space (shifted down to prevent top clipping and balance bottom margin)
-    top_y = 52 if height_mm >= 30 else 36
+    top_y = 52 if norm_h >= 30 else 36
 
     # Price string formatting
     price_str = ""
@@ -169,18 +177,18 @@ def build_tspl_label(
     if show_header and store_name:
         clean_store = store_name.replace('"', '').strip()
         store_w = len(clean_store) * 24
-        store_x = max(10, int(((width_mm * 8) - store_w) / 2))
+        store_x = max(10, int(((norm_w * 8) - store_w) / 2))
         lines.append(f'TEXT {store_x},{top_y},"4",0,1,1,"{clean_store}"')
-        prod_y = top_y + (38 if height_mm >= 30 else 32)
+        prod_y = top_y + (38 if norm_h >= 30 else 32)
     else:
-        prod_y = top_y + (20 if height_mm >= 30 else 12)
+        prod_y = top_y + (20 if norm_h >= 30 else 12)
 
     # Line 2: Product Name on left and Price on right
     clean_name = product_name[:18].replace('"', '').strip()
     lines.append(f'TEXT 20,{prod_y},"3",0,1,1,"{clean_name}"')
 
     if show_price and price_str:
-        price_x = max(230, (width_mm * 8) - (len(price_str) * 16) - 15)
+        price_x = max(230, (norm_w * 8) - (len(price_str) * 16) - 15)
         lines.append(f'TEXT {price_x},{prod_y},"3",0,1,1,"{price_str}"')
 
     # Line 3: Wide Barcode expanded across label (narrow=3, wide=6, height=48) for easy scanner detection

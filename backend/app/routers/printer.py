@@ -27,9 +27,11 @@ class DirectLabelRequest(BaseModel):
     barcode: str
     price: Optional[float] = None
     store_name: Optional[str] = "MOIRA LUXE"
+    tag_details: Optional[str] = None
     copies: Optional[int] = 1
     width_mm: Optional[float] = 50
     height_mm: Optional[float] = 30
+    label_type: Optional[str] = "normal"  # "normal" or "tagging"
     printer_name: Optional[str] = None
     show_price: Optional[bool] = True
     show_header: Optional[bool] = True
@@ -51,17 +53,25 @@ def direct_print_label(payload: DirectLabelRequest, db: Session = Depends(get_db
     """Send TSPL label command directly to DEV 632-L58P / Xprinter without browser popup."""
     try:
         store = get_store_settings(db)
-        effective_store_name = payload.store_name or store.get("store_name", "MOIRA LUXE")
+        is_tagging = (payload.label_type == "tagging") or ((payload.width_mm or 50) <= 20 and (payload.height_mm or 30) >= 70)
+        
+        # In tagging mode, tag_details takes precedence for the second line (e.g. weight, purity)
+        if is_tagging:
+            effective_store_name = payload.tag_details if payload.tag_details is not None else (payload.store_name or store.get("store_name", "MOIRA LUXE"))
+        else:
+            effective_store_name = payload.store_name or store.get("store_name", "MOIRA LUXE")
+
         raw_bytes = build_tspl_label(
             product_name=payload.product_name,
             barcode=payload.barcode,
             price=payload.price,
             store_name=effective_store_name,
             copies=payload.copies or 1,
-            width_mm=payload.width_mm or 50,
-            height_mm=payload.height_mm or 30,
+            width_mm=payload.width_mm or (14.3 if is_tagging else 50),
+            height_mm=payload.height_mm or (100.0 if is_tagging else 30),
             show_price=payload.show_price if payload.show_price is not None else True,
             show_header=payload.show_header if payload.show_header is not None else True,
+            label_type="tagging" if is_tagging else "normal",
         )
         target_printer = payload.printer_name
         if not target_printer:
