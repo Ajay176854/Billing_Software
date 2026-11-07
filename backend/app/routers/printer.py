@@ -35,6 +35,7 @@ class DirectLabelRequest(BaseModel):
     printer_name: Optional[str] = None
     show_price: Optional[bool] = True
     show_header: Optional[bool] = True
+    show_qr: Optional[bool] = False
 
 
 @router.get("/list")
@@ -69,6 +70,7 @@ def direct_print_label(payload: DirectLabelRequest, db: Session = Depends(get_db
             show_price=payload.show_price if payload.show_price is not None else True,
             show_header=payload.show_header if payload.show_header is not None else True,
             label_type="tagging" if is_tagging else "normal",
+            show_qr=payload.show_qr or False,
         )
         target_printer = payload.printer_name
         if not target_printer:

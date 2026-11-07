@@ -73,6 +73,7 @@ def build_tspl_label(
     show_price: bool = True,
     show_header: bool = True,
     label_type: Optional[str] = None,
+    show_qr: bool = False,
 ) -> bytes:
     """
     Generate standard TSPL command bytes with top breathing space to prevent printing over the top edge.
@@ -163,21 +164,30 @@ def build_tspl_label(
     # Standard rectangular label formatting (50x30, 50x25, 40x30)
     norm_w = 50.0 if (width_mm <= 20 and height_mm >= 70) else width_mm
     norm_h = 30.0 if (width_mm <= 20 and height_mm >= 70) else height_mm
+    w_label = int(norm_w) if norm_w == int(norm_w) else norm_w
+    h_label = int(norm_h) if norm_h == int(norm_h) else norm_h
 
     lines = [
-        f"SIZE {norm_w} mm, {norm_h} mm",
+        f"SIZE {w_label} mm, {h_label} mm",
         "GAP 2 mm, 0 mm",
         "DIRECTION 1",
         "CLS",
     ]
 
     # Top breathing space (shifted down to prevent top clipping and balance bottom margin)
-    top_y = 52 if norm_h >= 30 else 36
+    top_y = 48 if norm_h >= 30 else 32
 
-    # Price string formatting
+    # Price string formatting — formatted with Rs. prefix and /- suffix (e.g. Rs. 98/-)
     price_str = ""
     if show_price and price is not None:
-        price_str = f"Rs.{price:,.0f}" if price == int(price) else f"Rs.{price:,.2f}"
+        try:
+            p_val = float(price)
+            if p_val.is_integer():
+                price_str = f"Rs. {int(p_val)}/-"
+            else:
+                price_str = f"Rs. {p_val:,.2f}/-"
+        except Exception:
+            price_str = f"Rs. {price}/-"
 
     # Header: Store Name centered in the middle with bold Font 4
     if show_header and store_name:
@@ -185,24 +195,46 @@ def build_tspl_label(
         store_w = len(clean_store) * 24
         store_x = max(10, int(((norm_w * 8) - store_w) / 2))
         lines.append(f'TEXT {store_x},{top_y},"4",0,1,1,"{clean_store}"')
-        prod_y = top_y + (38 if norm_h >= 30 else 32)
+        prod_y = top_y + (38 if norm_h >= 30 else 30)
     else:
         prod_y = top_y + (20 if norm_h >= 30 else 12)
 
     # Line 2: Product Name on left and Price on right
-    clean_name = product_name[:18].replace('"', '').strip()
-    lines.append(f'TEXT 20,{prod_y},"3",0,1,1,"{clean_name}"')
-
+    # DEV 632-L58P thermal head is 384 dots max (48mm). Safe right margin is 350 dots.
+    safe_right = min(350, int((norm_w * 8) - 25))
     if show_price and price_str:
-        price_x = max(230, (norm_w * 8) - (len(price_str) * 16) - 15)
-        lines.append(f'TEXT {price_x},{prod_y},"3",0,1,1,"{price_str}"')
+        # Font 2 is 12x20 dots per char
+        price_w = len(price_str) * 12
+        price_x = max(180, safe_right - price_w)
+        # Allocate remaining space for product name with guaranteed gap to prevent overlap
+        avail_dots = max(60, price_x - 30)
+        max_chars = int(avail_dots / 12)
+        clean_name = product_name[:max_chars].replace('"', '').strip()
+        lines.append(f'TEXT 15,{prod_y},"2",0,1,1,"{clean_name}"')
+        lines.append(f'TEXT {price_x},{prod_y},"2",0,1,1,"{price_str}"')
+    else:
+        avail_dots = max(100, safe_right - 25)
+        max_chars = int(avail_dots / 12)
+        clean_name = product_name[:max_chars].replace('"', '').strip()
+        lines.append(f'TEXT 15,{prod_y},"2",0,1,1,"{clean_name}"')
 
-    # Line 3: Wide Barcode expanded across label (narrow=3, wide=6, height=48) for easy scanner detection
-    barcode_y = prod_y + (38 if height_mm >= 30 else 32)
-    barcode_h = 48 if height_mm >= 30 else 36
+    # Line 2.5: Professional horizontal divider bar under product name & price
+    divider_y = prod_y + 24
+    lines.append(f"BAR 15,{divider_y},{safe_right - 15},2")
+
+    # Line 3: Barcode or QR Code centered across the label
+    barcode_y = divider_y + 8
+    barcode_h = 50 if norm_h >= 30 else 36
     if barcode:
         clean_code = str(barcode).strip().replace('"', '')
-        lines.append(f'BARCODE 20,{barcode_y},"128",{barcode_h},1,0,3,6,"{clean_code}"')
+        if show_qr:
+            qr_w = 84
+            qr_x = max(15, int(((norm_w * 8) - qr_w) / 2))
+            lines.append(f'QRCODE {qr_x},{barcode_y},M,4,A,0,"{clean_code}"')
+        else:
+            est_bc_w = len(clean_code) * 22 + 60
+            bc_x = max(15, int(((norm_w * 8) - est_bc_w) / 2))
+            lines.append(f'BARCODE {bc_x},{barcode_y},"128",{barcode_h},1,0,2,4,"{clean_code}"')
 
     lines.append(f"PRINT {max(1, copies)}")
     lines.append("")

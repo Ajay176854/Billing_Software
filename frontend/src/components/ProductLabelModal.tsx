@@ -87,6 +87,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
         label_type: labelMode,
         show_price: showPrice,
         show_header: showStoreHeader,
+        show_qr: showQr,
       };
 
       // Send directly to local FastAPI server via configured api client
@@ -165,10 +166,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           padding: ${isTagging ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
           page-break-after: always;
         }
-        .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 4px; padding-bottom: 2px; }
+        .label-header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 3px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
         .store-header { font-size: 13.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; width: 100%; margin-top: 2px; margin-bottom: 4px; }
-        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; margin-left: 6px; text-align: right; }
-        .product-name { font-weight: 700; font-size: 13px; margin: 4px 0 4px 0; max-height: 34px; overflow: hidden; line-height: 1.15; word-break: break-word; text-align: center; width: 100%; }
+        .product-name { font-weight: 700; font-size: 11.5px; line-height: 1.2; text-align: left; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; padding-right: 6px; }
+        .price-tag { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; flex-shrink: 0; }
         .barcode-wrap { margin-top: 4px; display: flex; justify-content: center; width: 100%; }
         svg { max-width: 100%; height: auto; shape-rendering: crispEdges; }
         @media print {

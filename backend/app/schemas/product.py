@@ -27,6 +27,7 @@ class ProductUpdate(BaseModel):
     purchase_price: Optional[float] = Field(None, ge=0)
     selling_price: Optional[float] = Field(None, ge=0)
     tax_rate: Optional[float] = Field(None, ge=0, le=100)
+    stock_qty: Optional[int] = Field(None, ge=0)
     reorder_level: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
     status: Optional[str] = Field(None, pattern="^(active|inactive)$")

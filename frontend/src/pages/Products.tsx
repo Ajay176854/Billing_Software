@@ -114,6 +114,7 @@ export default function Products() {
       purchase_price: Number(form.purchase_price),
       selling_price: Number(form.selling_price),
       tax_rate: Number(form.tax_rate),
+      stock_qty: Number(form.stock_qty),
       reorder_level: Number(form.reorder_level),
       unit: form.unit,
     };
@@ -122,7 +123,6 @@ export default function Products() {
         await api.put(`/products/${editing.id}`, body);
         toast.success('Product updated');
       } else {
-        body.stock_qty = Number(form.stock_qty);
         await api.post('/products', body);
         toast.success('Product created');
       }
@@ -263,7 +263,7 @@ export default function Products() {
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Purchase Price *</label><input required type="number" step="0.01" min="0" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Selling Price *</label><input required type="number" step="0.01" min="0" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Tax Rate (%)</label><input type="number" step="0.1" min="0" max="100" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
-              {!editing && <div><label className="mb-1 block text-xs font-medium text-text-secondary">Initial Stock</label><input type="number" min="0" value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>}
+              <div><label className="mb-1 block text-xs font-medium text-text-secondary">{editing ? 'Current Stock' : 'Initial Stock'}</label><input type="number" min="0" value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Reorder Level</label><input type="number" min="0" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
             </div>
             <div className="mt-6 flex gap-3 justify-end">

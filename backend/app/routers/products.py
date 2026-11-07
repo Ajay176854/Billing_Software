@@ -73,7 +73,7 @@ def list_products(
     from sqlalchemy.orm import joinedload
     products = query.options(joinedload(Product.category)).order_by(Product.name).all()
     result = [_product_to_response(p) for p in products]
-    cache.set(cache_key, result, ttl=300)  # 5 min cache
+    cache.set(cache_key, result, ttl=5)  # 5s micro-cache so stock is always fresh and responsive
     return result
 
 
@@ -214,6 +214,18 @@ def update_product(product_id: int, data: ProductUpdate, db: Session = Depends(g
         ).first()
         if exists:
             raise HTTPException(status_code=400, detail=f"SKU '{update_data['sku']}' already exists")
+
+    # If stock quantity is changed directly during edit, record transaction
+    if "stock_qty" in update_data and update_data["stock_qty"] is not None and update_data["stock_qty"] != product.stock_qty:
+        diff = update_data["stock_qty"] - product.stock_qty
+        txn = StockTransaction(
+            product_id=product.id,
+            type="ADJUSTMENT" if diff < 0 else "STOCK_IN",
+            quantity=abs(diff),
+            reason="Updated via Edit Product",
+            user_id=current_user.id,
+        )
+        db.add(txn)
 
     for key, value in update_data.items():
         setattr(product, key, value)

@@ -1,27 +1,13 @@
 import axios from 'axios';
-import { setupCache } from 'axios-cache-interceptor';
 
-const instance = axios.create({
+// Standard Axios instance for real-time inventory and billing operations
+// Direct, zero-staleness API communication guarantees live stock numbers across all pages
+const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Wrap axios with automatic caching for GET requests (15s TTL)
-const api = setupCache(instance, {
-  ttl: 15 * 1000,
-  methods: ['get']
-});
-
-api.interceptors.response.use((response) => {
-  if (response.config.method && ['post', 'put', 'delete', 'patch'].includes(response.config.method)) {
-    // We can wipe the local cache store on successful mutation
-    // @ts-ignore - clear() exists on MemoryStorage but isn't on the base AxiosStorage type
-    if (typeof api.storage.clear === 'function') api.storage.clear();
-  }
-  return response;
-});
-
-// JWT interceptor
+// JWT interceptor — attach bearer token to every outgoing request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -30,7 +16,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 401 interceptor — auto logout
+// Response interceptor — handle network errors and auto logout on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
