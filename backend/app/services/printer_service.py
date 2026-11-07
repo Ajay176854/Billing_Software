@@ -143,16 +143,16 @@ def build_tspl_label(
                 if show_price and price_str:
                     lines.append(f'TEXT {col_x + 45},20,"2",90,1,1,"{price_str}"')
 
-            # --- Centered Fold Line at exact physical fold (Y = 238) ---
-            # Solid divider line '|' separating front face details from back face barcode
-            lines.append(f"BAR {col_x + 6},238,92,3")
+            # --- Centered Fold Marks (Edge ticks only at Y = 238) ---
+            # Subtle fold guide ticks at the outer edges only so the center quiet zone is 100% pure white for scanners
+            lines.append(f"BAR {col_x + 4},238,12,2")
+            lines.append(f"BAR {col_x + 88},238,12,2")
 
-            # --- PART 2: Back Face Barcode Tag (Y = 245 to 469) ---
-            # narrow=2 (10 mil standard) ensures crisp scannable bar/space ratios without thermal bleed
-            # Starting at Y=245 guarantees entire barcode + quiet zone finish safely before neck (Y=480)
+            # --- PART 2: Back Face Barcode Tag (Y = 255 to 479) ---
+            # Clean leading quiet zone (17 dots) + crisp 10-mil bars (narrow=2) + full trailing quiet zone before neck
             if clean_code:
-                lines.append(f'BARCODE {col_x + 85},245,"128",55,0,90,2,4,"{clean_code}"')
-                lines.append(f'TEXT {col_x + 22},265,"2",90,1,1,"{clean_code}"')
+                lines.append(f'BARCODE {col_x + 85},255,"128",55,0,90,2,4,"{clean_code}"')
+                lines.append(f'TEXT {col_x + 22},275,"2",90,1,1,"{clean_code}"')
 
         # Number of 100mm rows to feed (each row contains 3 horizontal stickers)
         rows_to_print = max(1, math.ceil(copies / 3)) if copies > 1 else 1
