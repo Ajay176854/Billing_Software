@@ -28,8 +28,8 @@ class DirectLabelRequest(BaseModel):
     price: Optional[float] = None
     store_name: Optional[str] = "MOIRA LUXE"
     copies: Optional[int] = 1
-    width_mm: Optional[int] = 50
-    height_mm: Optional[int] = 30
+    width_mm: Optional[float] = 50
+    height_mm: Optional[float] = 30
     printer_name: Optional[str] = None
     show_price: Optional[bool] = True
     show_header: Optional[bool] = True
@@ -183,4 +183,37 @@ def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depen
         return {"status": "ok", "message": f"Printed test receipt ({chosen_width})"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Direct test receipt print failed: {str(e)}")
+
+
+@router.api_route("/test-label", methods=["GET", "POST"])
+def direct_test_label(label_size: Optional[str] = "14x100mm", db: Session = Depends(get_db)):
+    """Print an instant test sample label directly to the thermal label printer."""
+    store = get_store_settings(db)
+    size_str = str(label_size or "").lower()
+    is_jewellery = "14" in size_str or "100" in size_str
+    width = 14.3 if is_jewellery else (50.0 if "50" in size_str else 40.0)
+    height = 100.0 if is_jewellery else (25.0 if "25" in size_str else 30.0)
+
+    try:
+        raw_bytes = build_tspl_label(
+            product_name="24K GOLD RING" if is_jewellery else "Moira Luxury Item",
+            barcode="94685000" if is_jewellery else "ML-10023",
+            price=26900.0 if is_jewellery else 1299.0,
+            store_name=store.get("store_name", "MOIRA LUXE"),
+            copies=1,
+            width_mm=width,
+            height_mm=height,
+            show_price=True,
+            show_header=True,
+        )
+        all_printers = get_available_printers()
+        target_printer = None
+        label_printers = [p for p in all_printers if "label" in p.lower()]
+        if label_printers:
+            target_printer = label_printers[0]
+        send_raw_to_printer(raw_bytes, target_printer)
+        return {"status": "ok", "message": f"Sent sample {label_size} label directly to printer"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Direct test label print failed: {str(e)}")
+
 

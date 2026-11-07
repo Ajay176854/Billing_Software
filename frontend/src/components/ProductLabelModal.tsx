@@ -15,7 +15,7 @@ interface ProductLabelModalProps {
   currencySymbol?: string;
 }
 
-export type LabelLayout = '50x30' | '50x25' | '40x30' | 'standard';
+export type LabelLayout = '50x30' | '50x25' | '40x30' | '14x100' | 'standard';
 
 const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   isOpen,
@@ -55,11 +55,13 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   const handleDirectPrint = async () => {
     setPrintingDirect(true);
     try {
-      const dimensions = labelSize === '50x25'
-        ? { width: 50, height: 25 }
-        : labelSize === '40x30'
-          ? { width: 40, height: 30 }
-          : { width: 50, height: 30 };
+      const dimensions = labelSize === '14x100'
+        ? { width: 14.3, height: 100 }
+        : labelSize === '50x25'
+          ? { width: 50, height: 25 }
+          : labelSize === '40x30'
+            ? { width: 40, height: 30 }
+            : { width: 50, height: 30 };
 
       // Send directly to local FastAPI server via configured api client
       let res;
@@ -139,14 +141,14 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           color: #000;
         }
         .label-page {
-          width: 50mm;
-          min-height: 30mm;
+          width: ${labelSize === '14x100' ? '14.3mm' : '50mm'};
+          min-height: ${labelSize === '14x100' ? '100mm' : '30mm'};
           margin: 0 auto;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: flex-start;
-          padding: 8.5mm 2mm 1.5mm 2mm;
+          justify-content: ${labelSize === '14x100' ? 'space-between' : 'flex-start'};
+          padding: ${labelSize === '14x100' ? '2mm 1mm' : '8.5mm 2mm 1.5mm 2mm'};
           page-break-after: always;
         }
         .label-header-row { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 4px; padding-bottom: 2px; }
@@ -158,14 +160,14 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
         @media print {
           @page { 
             margin: 0; 
-            size: ${labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
+            size: ${labelSize === '14x100' ? '14.3mm 100mm' : labelSize === '50x25' ? '50mm 25mm' : labelSize === '40x30' ? '40mm 30mm' : '50mm 30mm'};
           }
           body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .label-page { 
             border: none !important; 
             width: 100%; 
             height: 100%; 
-            padding: ${labelSize === '50x25' ? '6.5mm' : '8mm'} 1.5mm 1.5mm 1.5mm !important; 
+            padding: ${labelSize === '14x100' ? '1mm 0.5mm !important' : (labelSize === '50x25' ? '6.5mm' : '8mm') + ' 1.5mm 1.5mm 1.5mm !important'}; 
           }
         }
       `);
@@ -206,60 +208,146 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
           <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Live Thermal Label Preview</span>
 
-            <div
-              ref={printRef}
-              style={{
-                width: labelSize === '40x30' ? '180px' : '210px',
-                minHeight: labelSize === '50x25' ? '110px' : '135px',
-              }}
-              className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-9 px-3 pb-3 flex flex-col items-center justify-start text-center shadow-xs"
-            >
-              {/* Store Header centered in the middle */}
-              {showStoreHeader && (
-                <div className="store-header text-[14px] font-extrabold tracking-wider text-black text-center w-full mt-1 mb-1.5">
-                  {storeName}
-                </div>
-              )}
-
-              {/* Second row: Product Name & Price */}
-              <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-1 mb-1.5 px-0.5">
-                <span className="product-name text-[12px] font-bold text-black text-left truncate max-w-[130px]">
-                  {productName}
-                </span>
-
-                {showPrice && price !== undefined && (
-                  <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
-                    {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            {labelSize === '14x100' ? (
+              /* Specialized Seznik 14.3mm x 100mm Jewellery Dumbbell Tag Preview */
+              <div
+                ref={printRef}
+                className="w-[140px] flex flex-col items-center py-2 px-2 bg-white border-2 border-dashed border-amber-300 rounded-lg shadow-xs"
+              >
+                {/* Flap 1: Front Face (Brand, Item, Price & Barcode) */}
+                <div className="w-full px-2 py-2 border border-amber-200 bg-amber-50/50 rounded-md flex flex-col items-center text-center">
+                  <span className="text-[8px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/80 px-1.5 py-0.5 rounded mb-1">
+                    Front Flap
                   </span>
-                )}
-              </div>
+                  {showStoreHeader && (
+                    <div className="text-[11px] font-black text-black leading-tight uppercase truncate max-w-full">
+                      {storeName}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-semibold text-gray-800 leading-tight mt-0.5 truncate max-w-full">
+                    {productName}
+                  </div>
+                  {showPrice && price !== undefined && (
+                    <div className="text-[12px] font-extrabold text-emerald-700 mt-1">
+                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  <div className="barcode-wrap flex justify-center w-full mt-1.5 overflow-hidden">
+                    {productCode ? (
+                      <Barcode
+                        value={productCode}
+                        height={22}
+                        width={1.0}
+                        fontSize={8.5}
+                        margin={0}
+                        displayValue={true}
+                        background="transparent"
+                      />
+                    ) : (
+                      <span className="text-[8px] text-gray-400">No Barcode</span>
+                    )}
+                  </div>
+                </div>
 
-              {showQr && (
-                <div className="my-1">
-                  {productCode ? (
-                    <QRCodeSVG value={productCode} size={64} level="M" />
-                  ) : (
-                    <div className="text-[10px] text-gray-400">No Code</div>
+                {/* Middle Tail: Looping Strap (Wraps around jewellery) */}
+                <div className="w-[20px] h-16 my-1 border-x-2 border-dashed border-amber-300 bg-amber-50/20 flex items-center justify-center relative">
+                  <span className="text-[7.5px] font-bold text-amber-600 rotate-90 whitespace-nowrap tracking-wider uppercase">
+                    Loop Strap
+                  </span>
+                </div>
+
+                {/* Flap 2: Back Face (Matching details when folded) */}
+                <div className="w-full px-2 py-2 border border-amber-200 bg-amber-50/50 rounded-md flex flex-col items-center text-center">
+                  <span className="text-[8px] uppercase tracking-wider text-amber-800 font-bold bg-amber-200/80 px-1.5 py-0.5 rounded mb-1">
+                    Back Flap
+                  </span>
+                  {showStoreHeader && (
+                    <div className="text-[11px] font-black text-black leading-tight uppercase truncate max-w-full">
+                      {storeName}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-semibold text-gray-800 leading-tight mt-0.5 truncate max-w-full">
+                    {productName}
+                  </div>
+                  {showPrice && price !== undefined && (
+                    <div className="text-[12px] font-extrabold text-emerald-700 mt-1">
+                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  <div className="barcode-wrap flex justify-center w-full mt-1.5 overflow-hidden">
+                    {productCode ? (
+                      <Barcode
+                        value={productCode}
+                        height={22}
+                        width={1.0}
+                        fontSize={8.5}
+                        margin={0}
+                        displayValue={true}
+                        background="transparent"
+                      />
+                    ) : (
+                      <span className="text-[8px] text-gray-400">No Barcode</span>
+                    )}
+                  </div>
+                  <span className="text-[7.5px] text-gray-400 mt-0.5">Folds back-to-back</span>
+                </div>
+              </div>
+            ) : (
+              <div
+                ref={printRef}
+                style={{
+                  width: labelSize === '40x30' ? '180px' : '210px',
+                  minHeight: labelSize === '50x25' ? '110px' : '135px',
+                }}
+                className="bg-white border-2 border-dashed border-gray-300 rounded-lg pt-9 px-3 pb-3 flex flex-col items-center justify-start text-center shadow-xs"
+              >
+                {/* Store Header centered in the middle */}
+                {showStoreHeader && (
+                  <div className="store-header text-[14px] font-extrabold tracking-wider text-black text-center w-full mt-1 mb-1.5">
+                    {storeName}
+                  </div>
+                )}
+
+                {/* Second row: Product Name & Price */}
+                <div className="label-header-row flex items-baseline justify-between w-full border-b border-gray-300 pb-1 mb-1.5 px-0.5">
+                  <span className="product-name text-[12px] font-bold text-black text-left truncate max-w-[130px]">
+                    {productName}
+                  </span>
+
+                  {showPrice && price !== undefined && (
+                    <span className="price-tag text-[12px] font-extrabold text-black tracking-tight whitespace-nowrap ml-auto">
+                      {currencySymbol}{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </span>
                   )}
                 </div>
-              )}
 
-              <div className="barcode-wrap flex justify-center w-full mt-1">
-                {productCode ? (
-                  <Barcode
-                    value={productCode}
-                    height={labelSize === '50x25' ? 38 : 48}
-                    width={2.2}
-                    fontSize={13}
-                    margin={0}
-                    displayValue={true}
-                    background="#ffffff"
-                  />
-                ) : (
-                  <span className="text-[10px] text-gray-400">No Barcode</span>
+                {showQr && (
+                  <div className="my-1">
+                    {productCode ? (
+                      <QRCodeSVG value={productCode} size={64} level="M" />
+                    ) : (
+                      <div className="text-[10px] text-gray-400">No Code</div>
+                    )}
+                  </div>
                 )}
+
+                <div className="barcode-wrap flex justify-center w-full mt-1">
+                  {productCode ? (
+                    <Barcode
+                      value={productCode}
+                      height={labelSize === '50x25' ? 38 : 48}
+                      width={2.2}
+                      fontSize={13}
+                      margin={0}
+                      displayValue={true}
+                      background="#ffffff"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-gray-400">No Barcode</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Controls & Presets */}
@@ -271,9 +359,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
                 onChange={(e) => setLabelSize(e.target.value as LabelLayout)}
                 className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-800"
               >
-                <option value="50x30">50 × 30 mm (Recommended)</option>
+                <option value="50x30">50 × 30 mm (Standard Product Tag)</option>
                 <option value="50x25">50 × 25 mm (Compact)</option>
-                <option value="40x30">40 × 30 mm</option>
+                <option value="40x30">40 × 30 mm (Small Tag)</option>
+                <option value="14x100">14.3 × 100 mm (Seznik Jewellery Tag)</option>
               </select>
             </div>
 

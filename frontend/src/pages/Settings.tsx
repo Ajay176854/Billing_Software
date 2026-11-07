@@ -267,12 +267,13 @@ export default function SettingsPage() {
                 >
                   <option value="50x30mm">50 × 30 mm Thermal Die-Cut</option>
                   <option value="50x25mm">50 × 25 mm Compact</option>
-                  <option value="40x30mm">40 × 30 mm Jewellery / Small Item</option>
+                  <option value="40x30mm">40 × 30 mm Small Item</option>
+                  <option value="14x100mm">14.3 × 100 mm Seznik Jewellery Dumbbell Tag</option>
                 </select>
               </div>
             </div>
 
-            <div className="pt-2 flex gap-2">
+            <div className="pt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={async () => {
@@ -290,7 +291,27 @@ export default function SettingsPage() {
                 }}
                 className="w-full rounded-md border border-border py-1.5 text-xs font-medium text-text-primary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
               >
-                🖨️ Test {(form as any).receipt_width || '80mm'} Receipt (Direct)
+                🖨️ Test Receipt
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const size = (form as any).label_size || '14x100mm';
+                    try {
+                      await api.post(`/printer/test-label?label_size=${size}`);
+                    } catch {
+                      await axios.post(`http://127.0.0.1:8000/api/printer/test-label?label_size=${size}`);
+                    }
+                    toast.success(`Sent sample ${size} label directly to printer!`);
+                  } catch (err: any) {
+                    toast.error(`Label print failed: ${err?.response?.data?.detail || err.message}`);
+                  }
+                }}
+                className="w-full rounded-md border border-amber-500/40 bg-amber-500/10 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-500/20 transition-colors flex items-center justify-center gap-1.5"
+              >
+                🏷️ Test Sample Label
               </button>
             </div>
           </div>
