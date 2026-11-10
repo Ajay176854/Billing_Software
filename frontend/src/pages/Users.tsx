@@ -21,14 +21,21 @@ export default function UsersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const emailValue = form.email.trim() ? form.email.trim() : undefined;
       if (editingUser) {
-        await api.put(`/users/${editingUser.id}`, { name: form.name, email: form.email, role: form.role });
+        await api.put(`/users/${editingUser.id}`, { name: form.name.trim(), email: emailValue, role: form.role });
         if (form.password) {
             await api.post(`/users/${editingUser.id}/reset-password`, { new_password: form.password });
         }
         toast.success('User updated');
       } else {
-        await api.post('/users', form);
+        await api.post('/users', {
+          name: form.name.trim(),
+          username: form.username.trim(),
+          email: emailValue,
+          password: form.password,
+          role: form.role,
+        });
         toast.success('User created');
       }
       setShowModal(false);

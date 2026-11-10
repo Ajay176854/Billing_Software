@@ -18,13 +18,16 @@ from app.main import app
 
 class DesktopApi:
     def save_excel(self, base64_data, filename):
+        is_csv = filename.lower().endswith(".csv")
+        ext = ".csv" if is_csv else ".xlsx"
+        ftypes = [("CSV files", "*.csv"), ("All files", "*.*")] if is_csv else [("Excel files", "*.xlsx"), ("All files", "*.*")]
         root = tk.Tk()
         root.withdraw()
         root.attributes('-topmost', True)
         filepath = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
+            defaultextension=ext,
             initialfile=filename,
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            filetypes=ftypes,
             title="Save Report"
         )
         if filepath:

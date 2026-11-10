@@ -16,16 +16,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — handle network errors and auto logout on 401
+// Response interceptor — handle network errors with resilience retry and auto logout on 401
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Detect network errors or server unreachability
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+  async (error) => {
+    const config = error.config;
+
+    // Retry transient network errors (up to 2 times with 500ms backoff) before declaring backend error
+    const isNetworkError = error.code === 'ERR_NETWORK' || error.message === 'Network Error' || error.code === 'ECONNABORTED';
+    if (isNetworkError && config && !config._isRetry) {
+      config._retryCount = (config._retryCount || 0) + 1;
+      if (config._retryCount <= 2) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * config._retryCount));
+        return api(config);
+      }
+      // Only dispatch backend-error after all retries are exhausted
       window.dispatchEvent(new Event('backend-error'));
     }
 
-    if (error.response?.status === 401 && !error.config.url?.includes('/auth/login')) {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

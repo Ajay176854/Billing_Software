@@ -11,6 +11,9 @@ interface DashboardData {
   low_stock_count: number;
   out_of_stock_count: number;
   total_inventory_value: number;
+  total_retail_inventory_value?: number;
+  potential_inventory_profit?: number;
+  total_stock_units?: number;
   recent_sales: any[];
   top_products: any[];
   payment_summary: any[];
@@ -168,15 +171,33 @@ export default function Dashboard() {
         <StatCard 
           icon={TrendingUp} 
           label="Inventory Value" 
-          value={fmt(data.total_inventory_value)} 
+          value={fmt(data.total_retail_inventory_value || data.total_inventory_value)} 
+          subtitle={`Buy Cost: ${fmt(data.total_inventory_value)} | Profit: ${fmt(data.potential_inventory_profit || 0)}`}
           gradient="bg-gradient-to-br from-blue-500 to-blue-400" 
           onClick={() => setModalContent({
-            title: "Inventory Value",
+            title: "Inventory Valuation Details",
             desc: (
               <div className="space-y-3">
-                <p>The total calculated value of your current active inventory is <b>{fmt(data.total_inventory_value)}</b> (based on purchase price).</p>
-                <div className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-600 dark:text-blue-400">
-                  Value is calculated by multiplying the current stock quantity by the purchase price of each item.
+                <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
+                  <span className="text-text-muted">Retail Value (Sell Price):</span>
+                  <span className="font-bold text-success text-base">{fmt(data.total_retail_inventory_value || data.total_inventory_value)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
+                  <span className="text-text-muted">Cost Value (Buy Price):</span>
+                  <span className="font-semibold text-text-primary">{fmt(data.total_inventory_value)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
+                  <span className="text-text-muted">Expected Gross Profit:</span>
+                  <span className="font-bold text-blue-500">{fmt(data.potential_inventory_profit || 0)}</span>
+                </div>
+                {data.total_stock_units !== undefined && (
+                  <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
+                    <span className="text-text-muted">Total Stock Units:</span>
+                    <span className="font-semibold text-text-primary">{data.total_stock_units.toLocaleString('en-IN')} units</span>
+                  </div>
+                )}
+                <div className="rounded-lg bg-blue-500/10 p-2.5 text-xs text-blue-600 dark:text-blue-400">
+                  Buy Price represents the money invested in stock. Sell Price is the expected revenue. Gross Profit is the projected return.
                 </div>
               </div>
             ),

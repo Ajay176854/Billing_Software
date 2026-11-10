@@ -46,6 +46,10 @@ class DashboardStats(BaseModel):
     low_stock_count: int
     out_of_stock_count: int
     total_inventory_value: float
+    total_retail_inventory_value: float = 0.0
+    potential_inventory_profit: float = 0.0
+    total_stock_units: int = 0
     recent_sales: List[dict] = []
     top_products: List[dict] = []
     payment_summary: List[PaymentSummary] = []
+    low_stock_products: List[dict] = []

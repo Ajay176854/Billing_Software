@@ -29,8 +29,8 @@ else:
     engine_kwargs.update({
         "pool_size": 15,
         "max_overflow": 10,
-        "pool_pre_ping": False,  # Disabled to eliminate 2.5s handshake delay over cloud connection
-        "pool_recycle": 1800,
+        "pool_pre_ping": True,   # Automatically detects and discards stale/dropped cloud connections
+        "pool_recycle": 300,     # Recycle connections every 5 minutes before cloud timeouts
         "pool_use_lifo": True,   # Reuses the most recently used connection (hot connection)
     })
 

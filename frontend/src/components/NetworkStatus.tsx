@@ -7,6 +7,8 @@ const NetworkStatus: React.FC = () => {
   const [isBackendDown, setIsBackendDown] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
+  const [failCount, setFailCount] = useState(0);
+
   useEffect(() => {
     const handleOffline = () => setIsOffline(true);
     const handleOnline = () => {
@@ -15,9 +17,18 @@ const NetworkStatus: React.FC = () => {
     };
 
     const handleBackendError = () => {
-      // Only show backend down if we are actually online
+      // Only verify if we are currently online
       if (navigator.onLine) {
-        setIsBackendDown(true);
+        setFailCount((prev) => {
+          const next = prev + 1;
+          if (next >= 2) {
+            setIsBackendDown(true);
+          } else {
+            // Confirm with a background healthcheck before locking screen
+            checkBackend();
+          }
+          return next;
+        });
       }
     };
 
@@ -37,15 +48,21 @@ const NetworkStatus: React.FC = () => {
     
     setIsChecking(true);
     try {
-      // Hit a lightweight endpoint or healthcheck to verify backend is up
+      // Hit a lightweight endpoint or healthcheck with 8s timeout for cloud latency tolerance
       await api.get('/health', {
-        // bypass cache for this request
         cache: false,
-        timeout: 3000
+        timeout: 8000
       } as any);
       setIsBackendDown(false);
+      setFailCount(0);
     } catch (err) {
-      setIsBackendDown(true);
+      setFailCount((prev) => {
+        const next = prev + 1;
+        if (next >= 2) {
+          setIsBackendDown(true);
+        }
+        return next;
+      });
     } finally {
       setIsChecking(false);
     }

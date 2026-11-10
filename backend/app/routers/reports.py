@@ -15,6 +15,7 @@ from app.services.report_service import (
     get_itemized_sales_report,
     get_customer_traffic_report,
     get_monitoring_report,
+    get_product_inventory_report,
 )
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -73,6 +74,19 @@ def product_sales(
     start = datetime.fromisoformat(start_date) if start_date else None
     end = datetime.fromisoformat(end_date) if end_date else None
     return get_product_sales_report(db, start, end)
+
+
+@router.get("/product-inventory")
+def product_inventory(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get full product inventory report with stock levels and period sales performance."""
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    return get_product_inventory_report(db, start, end)
 
 
 @router.get("/itemized-sales")

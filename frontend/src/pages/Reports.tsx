@@ -3,17 +3,18 @@ import toast from 'react-hot-toast';
 import api from '../api/client';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { BarChart3, Download, X, Phone, MapPin, Mail, ShoppingBag, ChevronRight } from 'lucide-react';
+import { BarChart3, Download, X, Phone, MapPin, Mail, ShoppingBag, ChevronRight, FileSpreadsheet, FileText, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Pagination from '../components/Pagination';
 
 export default function Reports() {
-  const [tab, setTab] = useState<'sales' | 'products' | 'customers' | 'monitoring'>('sales');
+  const [tab, setTab] = useState<'sales' | 'products' | 'inventory' | 'customers' | 'monitoring'>('sales');
   const [salesData, setSalesData] = useState<any[]>([]);
   const [productData, setProductData] = useState<any[]>([]);
   const [itemizedData, setItemizedData] = useState<any[]>([]);
   const [customerTrafficData, setCustomerTrafficData] = useState<any[]>([]);
   const [monitoringData, setMonitoringData] = useState<any[]>([]);
+  const [inventoryData, setInventoryData] = useState<any[]>([]);
   
   const [monitoringPeriod, setMonitoringPeriod] = useState<'daily'|'monthly'>('daily');
   const [monitoringGroup, setMonitoringGroup] = useState<'overall'|'product'>('overall');
@@ -23,8 +24,10 @@ export default function Reports() {
 
   const [currentPageSales, setCurrentPageSales] = useState(1);
   const [currentPageProducts, setCurrentPageProducts] = useState(1);
+  const [currentPageInventory, setCurrentPageInventory] = useState(1);
   const [currentPageCustomer, setCurrentPageCustomer] = useState(1);
   const [currentPageMonitoring, setCurrentPageMonitoring] = useState(1);
+  const [inventorySearch, setInventorySearch] = useState('');
   const itemsPerPage = 15;
 
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -89,18 +92,20 @@ export default function Reports() {
         if (startDate) params.start_date = `${startDate}T00:00:00`;
         if (endDate) params.end_date = `${endDate}T23:59:59`;
 
-        const [salesRes, productRes, itemizedRes, customerRes, monitoringRes] = await Promise.all([
+        const [salesRes, productRes, itemizedRes, customerRes, monitoringRes, inventoryRes] = await Promise.all([
           api.get('/reports/sales-by-date', { params }),
           api.get('/reports/product-sales', { params }),
           api.get('/reports/itemized-sales', { params }),
           api.get('/reports/customer-traffic', { params }),
-          api.get('/reports/monitoring', { params: { ...params, period: monitoringPeriod, group_by: monitoringGroup } })
+          api.get('/reports/monitoring', { params: { ...params, period: monitoringPeriod, group_by: monitoringGroup } }),
+          api.get('/reports/product-inventory', { params })
         ]);
         setSalesData(salesRes.data);
         setProductData(productRes.data);
         setItemizedData(itemizedRes.data);
         setCustomerTrafficData(customerRes.data);
         setMonitoringData(monitoringRes.data);
+        setInventoryData(inventoryRes.data);
       } catch (err) {
         console.error("Failed to load reports", err);
       }
@@ -312,6 +317,73 @@ export default function Reports() {
       wsMonitoring.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     }
 
+      // --- Sheet 6: Overall Product Inventory & Performance ---
+      const wsInventory = workbook.addWorksheet('Overall Product Inventory');
+      wsInventory.columns = [
+        { header: 'Product Name', key: 'product_name', width: 32 },
+        { header: 'Barcode', key: 'barcode', width: 18 },
+        { header: 'SKU', key: 'sku', width: 16 },
+        { header: 'Category', key: 'category_name', width: 22 },
+        { header: 'Stock Qty', key: 'stock_qty', width: 12, style: { numFmt: '#,##0' } },
+        { header: 'Unit', key: 'unit', width: 10 },
+        { header: 'Buy Price', key: 'purchase_price', width: 15, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Sell Price', key: 'selling_price', width: 15, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Margin %', key: 'margin_pct', width: 12, style: { numFmt: '0.0"%"' } },
+        { header: 'Cost Value', key: 'stock_cost_value', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Retail Value', key: 'stock_retail_value', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Units Sold', key: 'units_sold', width: 14, style: { numFmt: '#,##0' } },
+        { header: 'Revenue', key: 'revenue', width: 16, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Profit', key: 'profit', width: 16, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Status', key: 'status', width: 12 },
+      ];
+
+      const rowsInventory = inventoryData.map(d => [
+        d.product_name,
+        d.barcode || '-',
+        d.sku || '-',
+        d.category_name,
+        d.stock_qty,
+        d.unit,
+        d.purchase_price,
+        d.selling_price,
+        d.margin_pct,
+        d.stock_cost_value,
+        d.stock_retail_value,
+        d.units_sold,
+        d.revenue,
+        d.profit,
+        (d.status || 'ACTIVE').toUpperCase(),
+      ]);
+
+      if (rowsInventory.length > 0) {
+        wsInventory.addTable({
+          name: 'OverallInventoryTable',
+          ref: 'A1',
+          headerRow: true,
+          totalsRow: true,
+          style: { theme: 'TableStyleMedium9', showRowStripes: true },
+          columns: [
+            { name: 'Product Name', filterButton: true },
+            { name: 'Barcode', filterButton: true },
+            { name: 'SKU', filterButton: true },
+            { name: 'Category', filterButton: true },
+            { name: 'Stock Qty', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Unit', filterButton: true },
+            { name: 'Buy Price', filterButton: true },
+            { name: 'Sell Price', filterButton: true },
+            { name: 'Margin %', filterButton: true, totalsRowFunction: 'average' },
+            { name: 'Cost Value', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Retail Value', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Units Sold', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Revenue', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Status', filterButton: true },
+          ],
+          rows: rowsInventory,
+        });
+        wsInventory.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = `Business_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
 
@@ -320,24 +392,96 @@ export default function Reports() {
         const bytes = new Uint8Array(buffer);
         let binary = '';
         // Process in chunks to avoid max call stack size exceeded on large files
-        for (let i = 0; i < bytes.byteLength; i += 1024) {
-          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 1024)));
+        for (let i = 0; i < bytes.byteLength; i += 8192) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192)));
         }
         const base64 = btoa(binary);
         
         // @ts-ignore
         const saved = await window.pywebview.api.save_excel(base64, filename);
         if (saved) {
-          toast.success('Export saved successfully!');
+          toast.success('Excel workbook saved successfully!');
         }
       } else {
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         saveAs(blob, filename);
-        toast.success('Export successful!');
+        toast.success('Excel workbook downloaded!');
       }
     } catch (err: any) {
       console.error(err);
       toast.error('Export failed: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const exportToCSV = async () => {
+    try {
+      if (!inventoryData || inventoryData.length === 0) {
+        toast.error('No inventory data to export');
+        return;
+      }
+
+      const headers = [
+        'Product Name',
+        'Barcode',
+        'SKU',
+        'Category',
+        'Stock Qty',
+        'Unit',
+        'Buy Price (Rs)',
+        'Sell Price (Rs)',
+        'Margin (%)',
+        'Stock Cost Value (Rs)',
+        'Stock Retail Value (Rs)',
+        'Units Sold',
+        'Sales Revenue (Rs)',
+        'Sales Profit (Rs)',
+        'Status'
+      ];
+
+      const escapeCSV = (val: any) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const rows = inventoryData.map(d => [
+        escapeCSV(d.product_name),
+        escapeCSV(d.barcode || ''),
+        escapeCSV(d.sku || ''),
+        escapeCSV(d.category_name),
+        d.stock_qty,
+        escapeCSV(d.unit),
+        d.purchase_price,
+        d.selling_price,
+        d.margin_pct,
+        d.stock_cost_value,
+        d.stock_retail_value,
+        d.units_sold,
+        d.revenue,
+        d.profit,
+        escapeCSV(d.status)
+      ].join(','));
+
+      const csvContent = '\uFEFF' + [headers.map(escapeCSV).join(','), ...rows].join('\r\n');
+      const filename = `Product_Inventory_Report_${new Date().toISOString().split('T')[0]}.csv`;
+
+      // @ts-ignore
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.save_excel) {
+        // Safe base64 encoding with UTF-8 support
+        const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+        // @ts-ignore
+        const saved = await window.pywebview.api.save_excel(base64, filename);
+        if (saved) {
+          toast.success('CSV Report saved successfully!');
+        }
+      } else {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, filename);
+        toast.success('CSV Report downloaded!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error('CSV Export failed: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -348,25 +492,35 @@ export default function Reports() {
         <p className="text-sm text-text-muted">Business analytics and insights</p>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div className="flex gap-1 rounded-xl border border-border bg-bg-card p-1">
           <button onClick={() => setTab('sales')} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${tab === 'sales' ? 'bg-accent text-white shadow' : 'text-text-muted hover:text-text-primary'}`}>Sales Report</button>
           <button onClick={() => setTab('products')} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${tab === 'products' ? 'bg-accent text-white shadow' : 'text-text-muted hover:text-text-primary'}`}>Product Sales</button>
+          <button onClick={() => setTab('inventory')} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${tab === 'inventory' ? 'bg-accent text-white shadow' : 'text-text-muted hover:text-text-primary'}`}>Overall Products</button>
           <button onClick={() => setTab('customers')} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${tab === 'customers' ? 'bg-accent text-white shadow' : 'text-text-muted hover:text-text-primary'}`}>Customer Traffic</button>
           <button onClick={() => setTab('monitoring')} className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${tab === 'monitoring' ? 'bg-accent text-white shadow' : 'text-text-muted hover:text-text-primary'}`}>Monitoring</button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary" />
             <span className="text-text-muted text-sm">to</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary" />
           </div>
           <button
+            onClick={exportToCSV}
+            disabled={loading}
+            title="Export full product inventory report as CSV spreadsheet"
+            className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3.5 py-2 text-sm font-medium text-text-primary transition-all hover:border-emerald-500 hover:text-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText className="h-4 w-4 text-emerald-500" /> Export CSV
+          </button>
+          <button
             onClick={exportToExcel}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-4 py-2 text-sm font-medium text-text-primary transition-all hover:border-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Export comprehensive multi-sheet Excel workbook (.xlsx)"
+            className="flex items-center gap-2 rounded-lg border border-border bg-accent text-white px-4 py-2 text-sm font-medium transition-all hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            <Download className="h-4 w-4" /> Export
+            <FileSpreadsheet className="h-4 w-4" /> Export Excel
           </button>
         </div>
       </div>
@@ -377,6 +531,19 @@ export default function Reports() {
 
         const totalPagesProducts = Math.ceil(productData.length / itemsPerPage);
         const paginatedProducts = productData.slice((currentPageProducts - 1) * itemsPerPage, currentPageProducts * itemsPerPage);
+
+        const filteredInventory = inventoryData.filter(p => {
+          if (!inventorySearch) return true;
+          const q = inventorySearch.toLowerCase();
+          return (
+            p.product_name?.toLowerCase().includes(q) ||
+            p.barcode?.toLowerCase().includes(q) ||
+            p.sku?.toLowerCase().includes(q) ||
+            p.category_name?.toLowerCase().includes(q)
+          );
+        });
+        const totalPagesInventory = Math.ceil(filteredInventory.length / itemsPerPage);
+        const paginatedInventory = filteredInventory.slice((currentPageInventory - 1) * itemsPerPage, currentPageInventory * itemsPerPage);
 
         const totalPagesCustomer = Math.ceil(customerTrafficData.length / itemsPerPage);
         const paginatedCustomers = customerTrafficData.slice((currentPageCustomer - 1) * itemsPerPage, currentPageCustomer * itemsPerPage);
@@ -473,6 +640,122 @@ export default function Reports() {
               totalItems={productData.length}
               itemsPerPage={itemsPerPage}
             />
+          </div>
+        ) : tab === 'inventory' ? (
+          <div className="space-y-4">
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-border bg-bg-card p-4">
+                <p className="text-xs font-medium text-text-muted uppercase">Total Products</p>
+                <p className="mt-1 text-xl font-bold text-text-primary">{inventoryData.length}</p>
+                <p className="text-xs text-text-muted mt-0.5">{inventoryData.reduce((acc, p) => acc + (p.stock_qty || 0), 0).toLocaleString('en-IN')} total stock units</p>
+              </div>
+              <div className="rounded-xl border border-border bg-bg-card p-4">
+                <p className="text-xs font-medium text-text-muted uppercase">Stock Cost Value</p>
+                <p className="mt-1 text-xl font-bold text-text-primary">{fmt(inventoryData.reduce((acc, p) => acc + (p.stock_cost_value || 0), 0))}</p>
+                <p className="text-xs text-text-muted mt-0.5">Based on Buy Price</p>
+              </div>
+              <div className="rounded-xl border border-border bg-bg-card p-4">
+                <p className="text-xs font-medium text-text-muted uppercase">Stock Retail Value</p>
+                <p className="mt-1 text-xl font-bold text-success">{fmt(inventoryData.reduce((acc, p) => acc + (p.stock_retail_value || 0), 0))}</p>
+                <p className="text-xs text-text-muted mt-0.5">Based on Sell Price</p>
+              </div>
+              <div className="rounded-xl border border-border bg-bg-card p-4">
+                <p className="text-xs font-medium text-text-muted uppercase">Expected Profit</p>
+                <p className="mt-1 text-xl font-bold text-accent">{fmt(inventoryData.reduce((acc, p) => acc + ((p.stock_retail_value || 0) - (p.stock_cost_value || 0)), 0))}</p>
+                <p className="text-xs text-text-muted mt-0.5">Projected Gross Margin</p>
+              </div>
+            </div>
+
+            {/* Search filter */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[240px] max-w-sm">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search products by name, barcode, sku, category..."
+                  value={inventorySearch}
+                  onChange={(e) => {
+                    setInventorySearch(e.target.value);
+                    setCurrentPageInventory(1);
+                  }}
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-bg-input text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                />
+              </div>
+              <p className="text-xs text-text-muted">
+                Showing {filteredInventory.length} of {inventoryData.length} products
+              </p>
+            </div>
+
+            {/* Inventory & Sales Table */}
+            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-bg-secondary/50">
+                  <tr className="text-text-muted text-xs">
+                    <th className="px-3 py-3 text-left font-medium">#</th>
+                    <th className="px-3 py-3 text-left font-medium">Product Name</th>
+                    <th className="px-3 py-3 text-left font-medium">Barcode / SKU</th>
+                    <th className="px-3 py-3 text-left font-medium">Category</th>
+                    <th className="px-3 py-3 text-right font-medium">Stock</th>
+                    <th className="px-3 py-3 text-right font-medium">Buy Price</th>
+                    <th className="px-3 py-3 text-right font-medium">Sell Price</th>
+                    <th className="px-3 py-3 text-right font-medium">Margin</th>
+                    <th className="px-3 py-3 text-right font-medium">Cost Val</th>
+                    <th className="px-3 py-3 text-right font-medium">Retail Val</th>
+                    <th className="px-3 py-3 text-right font-medium">Sold</th>
+                    <th className="px-3 py-3 text-right font-medium">Revenue</th>
+                    <th className="px-3 py-3 text-right font-medium">Profit</th>
+                    <th className="px-3 py-3 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedInventory.map((p: any, i: number) => (
+                    <tr key={p.product_id} className="border-b border-border/30 hover:bg-bg-hover/50">
+                      <td className="px-3 py-2.5 text-text-muted text-xs">{(currentPageInventory - 1) * itemsPerPage + i + 1}</td>
+                      <td className="px-3 py-2.5 font-medium text-text-primary max-w-[200px] truncate" title={p.product_name}>{p.product_name}</td>
+                      <td className="px-3 py-2.5 text-text-muted font-mono text-xs">
+                        <div>{p.barcode || '-'}</div>
+                        {p.sku && <div className="text-[10px] text-text-muted/70">{p.sku}</div>}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-muted text-xs">{p.category_name}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold">
+                        <span className={p.stock_qty <= 0 ? 'text-danger' : p.stock_qty <= 5 ? 'text-amber-500' : 'text-text-primary'}>
+                          {p.stock_qty} <span className="text-[10px] text-text-muted font-normal">{p.unit}</span>
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-text-muted">{fmt(p.purchase_price)}</td>
+                      <td className="px-3 py-2.5 text-right font-medium text-text-primary">{fmt(p.selling_price)}</td>
+                      <td className="px-3 py-2.5 text-right font-medium text-emerald-500 text-xs">{p.margin_pct}%</td>
+                      <td className="px-3 py-2.5 text-right text-text-muted text-xs">{fmt(p.stock_cost_value)}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold text-text-primary text-xs">{fmt(p.stock_retail_value)}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold text-text-primary">{p.units_sold}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold text-success">{fmt(p.revenue)}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold text-accent">{fmt(p.profit)}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-text-muted/10 text-text-muted'}`}>
+                          {p.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {paginatedInventory.length === 0 && (
+                    <tr>
+                      <td colSpan={14} className="px-4 py-12 text-center text-text-muted">
+                        <BarChart3 className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                        No product inventory data found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <Pagination
+                currentPage={currentPageInventory}
+                totalPages={totalPagesInventory}
+                onPageChange={setCurrentPageInventory}
+                totalItems={filteredInventory.length}
+                itemsPerPage={itemsPerPage}
+              />
+            </div>
           </div>
         ) : tab === 'monitoring' ? (
           <div className="space-y-4">

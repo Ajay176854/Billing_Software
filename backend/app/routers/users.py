@@ -25,17 +25,21 @@ def list_users(db: Session = Depends(get_db), current_user=Depends(require_role(
 @router.post("", response_model=UserResponse)
 def create_user(data: UserCreate, db: Session = Depends(get_db), current_user=Depends(require_role("admin"))):
     """Create a new user account."""
+    clean_username = data.username.strip()
     # Check duplicate username
-    if db.query(User).filter(User.username == data.username).first():
+    if db.query(User).filter(User.username == clean_username).first():
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    if data.email and db.query(User).filter(User.email == data.email).first():
+    # Clean email: treat empty or whitespace-only string as None so unique constraint does not fail
+    clean_email = data.email.strip() if data.email and data.email.strip() else None
+
+    if clean_email and db.query(User).filter(User.email == clean_email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
 
     user = User(
-        name=data.name,
-        username=data.username,
-        email=data.email,
+        name=data.name.strip(),
+        username=clean_username,
+        email=clean_email,
         password_hash=hash_password(data.password),
         role=data.role,
     )
@@ -62,9 +66,12 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), c
         raise HTTPException(status_code=404, detail="User not found")
 
     if data.name is not None:
-        user.name = data.name
+        user.name = data.name.strip()
     if data.email is not None:
-        user.email = data.email
+        clean_email = data.email.strip() if data.email.strip() else None
+        if clean_email and db.query(User).filter(User.email == clean_email, User.id != user_id).first():
+            raise HTTPException(status_code=400, detail="Email already exists")
+        user.email = clean_email
     if data.role is not None:
         user.role = data.role
     if data.status is not None:

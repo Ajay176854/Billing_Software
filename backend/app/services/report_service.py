@@ -8,6 +8,7 @@ from sqlalchemy import func, case
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.product import Product
+from app.models.category import Category
 
 
 def get_dashboard_stats(db: Session) -> dict:
@@ -27,18 +28,22 @@ def get_dashboard_stats(db: Session) -> dict:
     today_sales = float(today_result[0])
     today_bills = int(today_result[1])
 
-    # Product counts and inventory value
+    # Product counts and dual inventory value (cost/buy price vs retail/sell price)
     product_stats = db.query(
         func.count(Product.id).label('total'),
         func.sum(case(((Product.stock_qty == 0), 1), else_=0)).label('out_of_stock'),
         func.sum(case(((Product.stock_qty > 0) & (Product.stock_qty <= Product.reorder_level), 1), else_=0)).label('low_stock'),
-        func.coalesce(func.sum(Product.stock_qty * Product.purchase_price), 0).label('inventory_value')
+        func.coalesce(func.sum(Product.stock_qty * Product.purchase_price), 0).label('inventory_value'),
+        func.coalesce(func.sum(Product.stock_qty * Product.selling_price), 0).label('retail_value'),
+        func.coalesce(func.sum(Product.stock_qty), 0).label('total_stock_units')
     ).filter(Product.status == "active").first()
 
     total_products = product_stats.total or 0
     out_of_stock_count = product_stats.out_of_stock or 0
     low_stock_count = product_stats.low_stock or 0
     inventory_value = product_stats.inventory_value or 0
+    retail_value = product_stats.retail_value or 0
+    total_stock_units = product_stats.total_stock_units or 0
 
     # Recent 5 sales
     recent_sales = db.query(Sale).filter(
@@ -120,6 +125,9 @@ def get_dashboard_stats(db: Session) -> dict:
         "low_stock_count": low_stock_count,
         "out_of_stock_count": out_of_stock_count,
         "total_inventory_value": float(inventory_value),
+        "total_retail_inventory_value": float(retail_value),
+        "potential_inventory_profit": float(retail_value) - float(inventory_value),
+        "total_stock_units": int(total_stock_units),
         "recent_sales": recent_sales_data,
         "top_products": top_products_data,
         "payment_summary": payment_summary,
@@ -409,3 +417,55 @@ def get_monitoring_report(db: Session, period: str = "daily", group_by: str = "o
         return output
     else:
         return list(results_map.values())
+
+
+def get_product_inventory_report(db: Session, start_date: datetime = None, end_date: datetime = None) -> list:
+    """Get full product inventory report with historical/period sales stats."""
+    sales_filter = [Sale.status == "completed"]
+    if start_date:
+        sales_filter.append(Sale.created_at >= start_date)
+    if end_date:
+        sales_filter.append(Sale.created_at <= end_date)
+
+    sales_subquery = db.query(
+        SaleItem.product_id,
+        func.coalesce(func.sum(SaleItem.quantity), 0).label("units_sold"),
+        func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
+        func.coalesce(func.sum((SaleItem.unit_price * SaleItem.quantity) - SaleItem.discount - (Product.purchase_price * SaleItem.quantity)), 0).label("profit")
+    ).join(Sale, Sale.id == SaleItem.sale_id
+    ).join(Product, Product.id == SaleItem.product_id
+    ).filter(*sales_filter
+    ).group_by(SaleItem.product_id).subquery()
+
+    results = db.query(
+        Product,
+        Category.name.label("category_name"),
+        func.coalesce(sales_subquery.c.units_sold, 0).label("units_sold"),
+        func.coalesce(sales_subquery.c.revenue, 0.0).label("revenue"),
+        func.coalesce(sales_subquery.c.profit, 0.0).label("profit")
+    ).outerjoin(Category, Category.id == Product.category_id
+    ).outerjoin(sales_subquery, sales_subquery.c.product_id == Product.id
+    ).order_by(Product.name.asc()).all()
+
+    report = []
+    for p, cat_name, sold, rev, prof in results:
+        margin_pct = round(((p.selling_price - p.purchase_price) / p.selling_price * 100), 2) if p.selling_price and p.selling_price > 0 else 0.0
+        report.append({
+            "product_id": p.id,
+            "product_name": p.name,
+            "barcode": p.barcode or "",
+            "sku": p.sku or "",
+            "category_name": cat_name or "Uncategorized",
+            "stock_qty": p.stock_qty,
+            "unit": p.unit or "pcs",
+            "purchase_price": float(p.purchase_price),
+            "selling_price": float(p.selling_price),
+            "margin_pct": margin_pct,
+            "stock_cost_value": round(p.stock_qty * p.purchase_price, 2),
+            "stock_retail_value": round(p.stock_qty * p.selling_price, 2),
+            "units_sold": int(sold),
+            "revenue": round(float(rev), 2),
+            "profit": round(float(prof), 2),
+            "status": p.status,
+        })
+    return report
