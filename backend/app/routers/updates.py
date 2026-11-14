@@ -69,8 +69,6 @@ def check_for_updates():
             "published_at": data.get("published_at"),
             "is_cloud": is_cloud,
         }
-            "published_at": data.get("published_at"),
-        }
     except Exception as e:
         # Fallback silently if offline or rate limited
         return {
