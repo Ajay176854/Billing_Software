@@ -73,6 +73,7 @@ def build_tspl_label(
     show_header: bool = True,
     label_type: Optional[str] = None,
     show_qr: bool = False,
+    enabled_columns: Optional[List[int]] = None,
 ) -> bytes:
     """
     Generate standard TSPL command bytes with top breathing space to prevent printing over the top edge.
@@ -121,12 +122,19 @@ def build_tspl_label(
 
         clean_code = str(barcode or "").strip().replace('"', "")[:10]
 
-        # Print all 3 horizontal stickers simultaneously across the 3-up roll in FULL LANDSCAPE
+        # Filter active columns (0=Left, 1=Middle, 2=Right) to prevent paper waste
+        active_cols = [c for c in enabled_columns if c in (0, 1, 2)] if enabled_columns else [0, 1, 2]
+        if not active_cols:
+            active_cols = [0, 1, 2]
+
+        # Print selected horizontal stickers across the 3-up roll in FULL LANDSCAPE
         # Symmetrically balanced across the center fold (Y = 200):
         # - Front Half (Details: Y = 25 to 185): Fully contained BEFORE the fold
         # - Dashed Fold Line at Y = 200: Exact physical center where tag folds back-to-back
         # - Back Half (Barcode: Y = 225 to 365): Fully contained AFTER the fold
         for col_idx in range(3):
+            if col_idx not in active_cols:
+                continue  # Skip disabled column to save physical stickers & avoid paper waste
             col_x = col_starts[col_idx]
 
             # --- PART 1: Front Face Details (Y = 15 to 230) ---
