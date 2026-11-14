@@ -480,18 +480,13 @@ def get_sample_invoice(format: Optional[str] = Query("A4", description="Format: 
                 </tr>
             </table>
 
-            <!-- Footer & Signature -->
+            <!-- Footer -->
             <div class="footer-box">
-                <div class="terms">
+                <div class="terms" style="max-width: 100%;">
                     <strong>Terms & Conditions:</strong><br>
                     1. Goods once sold can be exchanged within 7 days with original tax invoice.<br>
                     2. No cash refund on sold jewellery items.<br>
                     3. Thank you for shopping with <strong>{store['store_name']}</strong>!
-                </div>
-                <div class="sign-box">
-                    <div class="sign-line"></div>
-                    <div class="sign-label">For {store['store_name']}</div>
-                    <div style="font-size:10px; color:#64748b;">Authorized Signatory</div>
                 </div>
             </div>
         </div>

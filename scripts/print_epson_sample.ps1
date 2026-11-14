@@ -237,18 +237,13 @@ $doc.add_PrintPage({
     $g.DrawLine($penDark, $totX, $ty, $right, $ty)
     $y = [Math]::Max(($y + 80), ($ty + 10))
 
-    # Terms & Signature
+    # Terms & Conditions
     $y += 18
     $g.DrawLine((New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(203, 213, 225))), $left, $y, $right, $y)
     $y += 12
 
     $terms = "Terms & Conditions:`n1. Goods once sold can be exchanged within 7 days with original tax invoice.`n2. No cash refund on jewellery items.`n3. Thank you for shopping with $storeName!"
     $g.DrawString($terms, $fontSmall, $brushSlate, $left, $y)
-
-    $signX = $right - 180
-    $g.DrawLine($penDark, $signX, ($y + 35), ($signX + 160), ($y + 35))
-    $g.DrawString("For $storeName", $fontBold, $brushDark, ($signX + 25), ($y + 40))
-    $g.DrawString("Authorized Signatory", $fontSmall, $brushMuted, ($signX + 20), ($y + 55))
 
     $e.HasMorePages = $false
 })
