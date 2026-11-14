@@ -19,7 +19,14 @@ def get_current_app_version() -> str:
         import sys
         if getattr(sys, "frozen", False):
             base_dir = Path(sys.executable).parent
-            # Also check MEIPASS
+            # Check external version.txt next to executable first (updated by updater batch)
+            ext_v = base_dir / "version.txt"
+            if ext_v.exists():
+                v = ext_v.read_text(encoding="utf-8").strip()
+                if v:
+                    return v.lstrip("v")
+
+            # Check bundled MEIPASS
             mei_dir = getattr(sys, "_MEIPASS", None)
             if mei_dir and (Path(mei_dir) / "version.txt").exists():
                 v = (Path(mei_dir) / "version.txt").read_text(encoding="utf-8").strip()
@@ -27,12 +34,11 @@ def get_current_app_version() -> str:
                     return v.lstrip("v")
         else:
             base_dir = Path(__file__).resolve().parent.parent.parent
-
-        v_file = base_dir / "version.txt"
-        if v_file.exists():
-            v = v_file.read_text(encoding="utf-8").strip()
-            if v:
-                return v.lstrip("v")
+            v_file = base_dir / "version.txt"
+            if v_file.exists():
+                v = v_file.read_text(encoding="utf-8").strip()
+                if v:
+                    return v.lstrip("v")
     except Exception:
         pass
 
@@ -51,7 +57,7 @@ def get_current_app_version() -> str:
     except Exception:
         pass
 
-    return "1.0.3"
+    return "1.0.4"
 
 
 class Settings(BaseSettings):

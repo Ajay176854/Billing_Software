@@ -30,8 +30,15 @@ export default function UpdateNotification() {
     const checkForUpdates = async () => {
       try {
         const res = await api.get('/updates/check');
-        if (res.data?.update_available) {
+        if (
+          res.data?.update_available &&
+          res.data?.latest_version &&
+          res.data?.current_version &&
+          res.data.latest_version.trim() !== res.data.current_version.trim()
+        ) {
           setUpdateInfo(res.data);
+        } else {
+          setUpdateInfo(null);
         }
       } catch (err) {
         // Silently skip if offline
