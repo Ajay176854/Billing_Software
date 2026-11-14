@@ -618,6 +618,8 @@ def print_invoice_document_direct(
     subtotal: float,
     discount: float,
     total: float,
+    tax: float = 0.0,
+    tax_label: Optional[str] = None,
     store_name: str = "MOIRA LUXE",
     store_address: str = "Main Road, Thuckalay, Kanyakumari Dist - 629175",
     store_phone: str = "8438353504",
@@ -656,6 +658,17 @@ def print_invoice_document_direct(
 
     from app.services.invoice_service import number_to_indian_words
 
+    clean_subtotal = float(subtotal or 0.0)
+    clean_discount = float(discount or 0.0)
+    clean_tax = float(tax or 0.0)
+    clean_total = float(total or 0.0)
+
+    # If tax is not explicitly provided but total exceeds subtotal - discount, calculate implicit tax
+    if clean_tax == 0.0 and clean_total > (clean_subtotal - clean_discount):
+        diff = round(clean_total - (clean_subtotal - clean_discount), 2)
+        if diff > 0.01:
+            clean_tax = diff
+
     invoice_data = {
         "store_name": store_name,
         "store_address": store_address,
@@ -666,11 +679,12 @@ def print_invoice_document_direct(
         "customer_place": customer_place or "Thuckalay",
         "payment_method": payment_method or "CASH",
         "created_at": created_at,
-        "subtotal": float(subtotal),
-        "discount": float(discount or 0),
-        "tax": float(round(total - (subtotal - discount), 2)) if total > (subtotal - discount) else 0.0,
-        "total": float(total),
-        "words": number_to_indian_words(total),
+        "subtotal": clean_subtotal,
+        "discount": clean_discount,
+        "tax": clean_tax,
+        "tax_label": tax_label or ("GST / Tax" if clean_tax > 0 else ""),
+        "total": clean_total,
+        "words": number_to_indian_words(clean_total),
         "items": items,
     }
 
@@ -714,6 +728,8 @@ def print_receipt_direct(
     subtotal: float,
     discount: float,
     total: float,
+    tax: float = 0.0,
+    tax_label: Optional[str] = None,
     store_name: str = "MOIRA LUXE",
     store_address: str = "Thuckalay",
     store_phone: str = "8438353504",
@@ -724,6 +740,7 @@ def print_receipt_direct(
     payment_method: Optional[str] = None,
     customer_name: Optional[str] = None,
     customer_phone: Optional[str] = None,
+    customer_place: Optional[str] = None,
 ) -> bool:
     """
     Direct hardware print:
@@ -739,6 +756,8 @@ def print_receipt_direct(
             items=items,
             subtotal=subtotal,
             discount=discount,
+            tax=tax,
+            tax_label=tax_label,
             total=total,
             store_name=store_name,
             store_address=store_address,
@@ -748,6 +767,7 @@ def print_receipt_direct(
             printer_name=target,
             customer_name=customer_name,
             customer_phone=customer_phone,
+            customer_place=customer_place,
             created_at=created_at,
             payment_method=payment_method,
         )

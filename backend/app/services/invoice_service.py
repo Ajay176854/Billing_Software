@@ -130,6 +130,16 @@ def generate_invoice_html(db: Session, sale_id: int, paper_format: Optional[str]
         customer_phone = sale.customer_phone or "-"
         customer_place = sale.customer_place or ""
 
+        tax_label = "GST / Tax"
+        if sale.tax and sale.tax > 0:
+            rates = [it.tax_rate for it in sale.items if getattr(it, 'tax_rate', 0) and it.tax_rate > 0]
+            if rates and len(set(rates)) == 1:
+                rate_val = rates[0]
+                tax_label = f"GST ({int(rate_val) if rate_val.is_integer() else rate_val}%)"
+            elif (sale.subtotal - (sale.discount or 0)) > 0:
+                pct = round((sale.tax / (sale.subtotal - (sale.discount or 0))) * 100, 1)
+                tax_label = f"GST ({int(pct) if pct.is_integer() else pct}%)"
+
         return f"""
         <!DOCTYPE html>
         <html>
@@ -326,7 +336,7 @@ def generate_invoice_html(db: Session, sale_id: int, paper_format: Optional[str]
                                     <td style="text-align:right; font-weight:600; color:#dc2626;">-{currency} {sale.discount:,.2f}</td>
                                 </tr>""" if sale.discount and sale.discount > 0 else ""}
                                 {f"""<tr>
-                                    <td style="color:#64748b;">GST / Tax:</td>
+                                    <td style="color:#64748b;">{tax_label}:</td>
                                     <td style="text-align:right; font-weight:600;">+{currency} {sale.tax:,.2f}</td>
                                 </tr>""" if sale.tax and sale.tax > 0 else ""}
                                 <tr class="grand-total-row">
@@ -392,6 +402,16 @@ def generate_invoice_html(db: Session, sale_id: int, paper_format: Optional[str]
             <td class="item-total">{currency}{item.subtotal:,.2f}</td>
         </tr>
         """
+
+    tax_label = "Tax"
+    if sale.tax and sale.tax > 0:
+        rates = [it.tax_rate for it in sale.items if getattr(it, 'tax_rate', 0) and it.tax_rate > 0]
+        if rates and len(set(rates)) == 1:
+            rate_val = rates[0]
+            tax_label = f"GST ({int(rate_val) if rate_val.is_integer() else rate_val}%)"
+        elif (sale.subtotal - (sale.discount or 0)) > 0:
+            pct = round((sale.tax / (sale.subtotal - (sale.discount or 0))) * 100, 1)
+            tax_label = f"GST ({int(pct) if pct.is_integer() else pct}%)"
 
     html = f"""
     <!DOCTYPE html>
@@ -507,7 +527,7 @@ def generate_invoice_html(db: Session, sale_id: int, paper_format: Optional[str]
             <table class="totals">
                 <tr><td>Subtotal</td><td style="text-align:right;">{currency} {sale.subtotal:,.2f}</td></tr>
                 {f"<tr><td>Discount</td><td style='text-align:right;'>-{currency} {sale.discount:,.2f}</td></tr>" if sale.discount and sale.discount > 0 else ""}
-                {f"<tr><td>Tax</td><td style='text-align:right;'>+{currency} {sale.tax:,.2f}</td></tr>" if sale.tax and sale.tax > 0 else ""}
+                {f"<tr><td>{tax_label}</td><td style='text-align:right;'>+{currency} {sale.tax:,.2f}</td></tr>" if sale.tax and sale.tax > 0 else ""}
                 <tr class="grand-total"><td>Total</td><td style="text-align:right;">{currency} {sale.total:,.2f}</td></tr>
             </table>
 

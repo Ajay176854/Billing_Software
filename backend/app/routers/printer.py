@@ -90,6 +90,9 @@ class DirectReceiptPayload(BaseModel):
     items: Optional[List[dict]] = None
     subtotal: Optional[float] = None
     discount: Optional[float] = 0.0
+    tax: Optional[float] = 0.0
+    tax_rate: Optional[float] = None
+    tax_label: Optional[str] = None
     total: Optional[float] = None
     payment_method: Optional[str] = "CASH"
     store_name: Optional[str] = None
@@ -116,28 +119,52 @@ def direct_print_receipt(
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     store = get_store_settings(db)
     payment_method = "CASH"
+    tax = 0.0
+    tax_label = ""
     
     if sale:
         invoice_no = sale.invoice_no
         items_data = [
             {
                 "name": item.product.name if item.product else "Item",
+                "code": item.product.sku if (item.product and item.product.sku) else "",
                 "quantity": item.quantity,
-                "price": item.subtotal,
+                "price": item.unit_price if (hasattr(item, 'unit_price') and item.unit_price is not None) else (item.subtotal / item.quantity if item.quantity else item.subtotal),
+                "discount": getattr(item, 'discount', 0.0) or 0.0,
+                "amount": item.subtotal,
             }
             for item in sale.items
         ]
-        subtotal = sale.subtotal
-        discount = sale.discount
-        total = sale.total
+        subtotal = float(sale.subtotal or 0.0)
+        discount = float(sale.discount or 0.0)
+        tax = float(sale.tax or 0.0)
+        total = float(sale.total or 0.0)
         payment_method = sale.payment_method or "CASH"
+
+        if tax > 0:
+            rates = [it.tax_rate for it in sale.items if getattr(it, 'tax_rate', 0) and it.tax_rate > 0]
+            if rates and len(set(rates)) == 1:
+                rate_val = rates[0]
+                tax_label = f"GST ({int(rate_val) if rate_val.is_integer() else rate_val}%)"
+            elif (subtotal - discount) > 0:
+                calc_rate = round((tax / (subtotal - discount)) * 100, 1)
+                tax_label = f"GST ({int(calc_rate) if calc_rate.is_integer() else calc_rate}%)"
+            else:
+                tax_label = "GST"
     elif payload and payload.invoice_no:
         invoice_no = payload.invoice_no
         items_data = payload.items or []
-        subtotal = payload.subtotal or 0.0
-        discount = payload.discount or 0.0
-        total = payload.total or 0.0
+        subtotal = float(payload.subtotal or 0.0)
+        discount = float(payload.discount or 0.0)
+        tax = float(payload.tax or 0.0)
+        total = float(payload.total or 0.0)
         payment_method = payload.payment_method or "CASH"
+        if payload.tax_label:
+            tax_label = payload.tax_label
+        elif payload.tax_rate and tax > 0:
+            tax_label = f"GST ({payload.tax_rate}%)"
+        elif tax > 0:
+            tax_label = "GST"
     else:
         raise HTTPException(status_code=404, detail="Sale not found")
 
@@ -176,6 +203,8 @@ def direct_print_receipt(
                 items=items_data,
                 subtotal=subtotal,
                 discount=discount,
+                tax=tax,
+                tax_label=tax_label,
                 total=total,
                 store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
                 store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
@@ -185,6 +214,7 @@ def direct_print_receipt(
                 printer_name=target_printer,
                 customer_name=cust_name,
                 customer_phone=cust_phone,
+                customer_place=cust_place,
                 created_at=created_at_str,
                 payment_method=payment_method,
             )
@@ -207,6 +237,8 @@ def direct_print_receipt(
             items=items_data,
             subtotal=subtotal,
             discount=discount,
+            tax=tax,
+            tax_label=tax_label,
             total=total,
             store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
             store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
@@ -215,6 +247,9 @@ def direct_print_receipt(
             paper_width=(payload and payload.paper_width) or store.get("receipt_width", "58mm"),
             created_at=created_at_str,
             payment_method=payment_method,
+            customer_name=cust_name,
+            customer_phone=cust_phone,
+            customer_place=cust_place,
             printer_name=target_printer,
         )
         return {"status": "ok", "printer_type": "thermal", "message": f"Printed receipt for {invoice_no}"}
@@ -547,6 +582,8 @@ def direct_test_invoice(format: Optional[str] = "A4", printer_name: Optional[str
             items=test_items,
             subtotal=subtotal,
             discount=discount,
+            tax=189.00,
+            tax_label="GST (3%)",
             total=total,
             store_name=store.get("store_name", "MOIRA LUXE"),
             store_address=store.get("store_address", "Main Road, Thuckalay"),
@@ -588,6 +625,8 @@ def direct_test_receipt(paper_width: Optional[str] = "58mm", db: Session = Depen
             items=test_items,
             subtotal=subtotal,
             discount=discount,
+            tax=189.00,
+            tax_label="GST (3%)",
             total=total,
             store_name=store.get("store_name", "MOIRA LUXE"),
             store_address=store.get("store_address", "Fashion Street, Retail Hub"),

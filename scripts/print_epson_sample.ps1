@@ -54,6 +54,7 @@ $items = @(
 $subtotal = 6648.00
 $discount = 350.00
 $tax = 189.00
+$taxLabel = "GST (3%)"
 $total = 6487.00
 $words = "Six Thousand Four Hundred Eighty Seven Rupees Only"
 
@@ -70,11 +71,23 @@ if ($JsonPath -and (Test-Path $JsonPath)) {
         if ($raw.payment_method) { $paymentMethod = $raw.payment_method.ToUpper() }
         if ($raw.cashier) { $cashier = $raw.cashier }
         if ($raw.created_at) { $nowStr = $raw.created_at }
-        if ($raw.subtotal) { $subtotal = [double]$raw.subtotal }
-        if ($raw.discount) { $discount = [double]$raw.discount }
-        if ($raw.tax) { $tax = [double]$raw.tax }
-        if ($raw.total) { $total = [double]$raw.total }
-        if ($raw.words) { $words = $raw.words }
+
+        # Explicit dynamic financial parsing (handling 0.0 accurately)
+        $subtotal = if ($null -ne $raw.subtotal) { [double]$raw.subtotal } else { 0.0 }
+        $discount = if ($null -ne $raw.discount) { [double]$raw.discount } else { 0.0 }
+        $tax = if ($null -ne $raw.tax) { [double]$raw.tax } else { 0.0 }
+        $total = if ($null -ne $raw.total) { [double]$raw.total } else { 0.0 }
+        $words = if ($raw.words) { $raw.words } else { "" }
+
+        if ($raw.tax_label) {
+            $taxLabel = $raw.tax_label
+        } elseif ($tax -gt 0 -and $raw.tax_rate) {
+            $taxLabel = "GST ($($raw.tax_rate)%)"
+        } elseif ($tax -gt 0) {
+            $taxLabel = "GST / Tax"
+        } else {
+            $taxLabel = ""
+        }
 
         if ($raw.items -and $raw.items.Count -gt 0) {
             $parsedItems = @()
@@ -82,10 +95,10 @@ if ($JsonPath -and (Test-Path $JsonPath)) {
             foreach ($it in $raw.items) {
                 $pName = if ($it.name) { $it.name } else { "Item" }
                 $pCode = if ($it.code) { $it.code } else { ("SKU-{0:D3}" -f $i) }
-                $pQty = if ($it.quantity) { [int]$it.quantity } else { 1 }
-                $pRate = if ($it.price) { [double]$it.price } else { 0.0 }
-                $pDisc = if ($it.discount) { [double]$it.discount } else { 0.0 }
-                $pAmt = if ($it.amount) { [double]$it.amount } else { ($pQty * $pRate - $pDisc) }
+                $pQty = if ($null -ne $it.quantity) { [int]$it.quantity } else { 1 }
+                $pRate = if ($null -ne $it.price) { [double]$it.price } else { 0.0 }
+                $pDisc = if ($null -ne $it.discount) { [double]$it.discount } else { 0.0 }
+                $pAmt = if ($null -ne $it.amount) { [double]$it.amount } else { ($pQty * $pRate - $pDisc) }
                 $parsedItems += @{ idx=$i; name=$pName; code=$pCode; qty=$pQty; rate=$pRate; disc=$pDisc; amt=$pAmt }
                 $i++
             }
@@ -192,7 +205,11 @@ $doc.add_PrintPage({
         $g.DrawString("SKU: $($item.code)", $fontSmall, $brushMuted, $col2, ($y + 18))
         $g.DrawString($item.qty.ToString(), $fontBold, $brushDark, ($col3 + 8), ($y + 8))
         $g.DrawString(("{0:N2}" -f [double]$item.rate), $fontText, $brushDark, $col4, ($y + 8))
-        $g.DrawString(("-{0:N2}" -f [double]$item.disc), $fontText, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 38, 38))), $col5, ($y + 8))
+        if ([double]$item.disc -gt 0) {
+            $g.DrawString(("-{0:N2}" -f [double]$item.disc), $fontText, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 38, 38))), $col5, ($y + 8))
+        } else {
+            $g.DrawString("-", $fontText, $brushMuted, ($col5 + 8), ($y + 8))
+        }
         $g.DrawString(("{0:N2}" -f [double]$item.amt), $fontBold, $brushDark, $col6, ($y + 8))
         
         $y += $rowH
@@ -224,7 +241,8 @@ $doc.add_PrintPage({
     }
 
     if ($tax -gt 0) {
-        $g.DrawString("GST (3%):", $fontText, $brushSlate, $totX, $ty)
+        $taxTitle = if ($taxLabel.Trim().EndsWith(":")) { $taxLabel.Trim() } else { "$($taxLabel.Trim()):" }
+        $g.DrawString($taxTitle, $fontText, $brushSlate, $totX, $ty)
         $g.DrawString(("+Rs. {0:N2}" -f $tax), $fontText, $brushSlate, $totValX, $ty, $sfRight)
         $ty += 20
     }
