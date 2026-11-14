@@ -1,7 +1,8 @@
 """
 Billing router — complete a sale.
 """
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -45,7 +46,12 @@ def complete_bill(
 
 
 @router.get("/invoice/{sale_id}", response_class=HTMLResponse)
-def get_invoice(sale_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_invoice(
+    sale_id: int, 
+    format: Optional[str] = Query(None, description="Paper format: A4, A5, 58mm, 80mm"),
+    db: Session = Depends(get_db), 
+    current_user=Depends(get_current_user)
+):
     """Get printable HTML invoice for a sale."""
-    html = generate_invoice_html(db, sale_id)
+    html = generate_invoice_html(db, sale_id, paper_format=format)
     return HTMLResponse(content=html)

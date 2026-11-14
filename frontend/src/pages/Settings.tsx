@@ -241,25 +241,27 @@ export default function SettingsPage() {
           {/* Printer Card */}
           <div className="rounded-lg border border-border bg-bg-hover/30 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-primary">2-in-1 Thermal Printer</span>
-              <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-400 uppercase">DEV 632-L58P</span>
+              <span className="text-xs font-semibold text-text-primary">Printers & Invoice Format</span>
+              <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase">Epson L6460 & Thermal</span>
             </div>
             
             <div className="space-y-2">
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Receipt Roll Width</label>
+                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Bill / Invoice Format & Paper Size</label>
                 <select
-                  value={(form as any).receipt_width || '58mm'}
+                  value={(form as any).receipt_width || 'A4'}
                   onChange={(e) => setForm({ ...form, receipt_width: e.target.value } as any)}
-                  className="w-full rounded-md border border-border bg-bg-input px-2.5 py-1.5 text-xs text-text-primary"
+                  className="w-full rounded-md border border-border bg-bg-input px-2.5 py-1.5 text-xs text-text-primary font-medium"
                 >
-                  <option value="58mm">58mm Thermal (DEV L58P Native)</option>
-                  <option value="80mm">80mm Thermal (Standard POS)</option>
+                  <option value="A4">A4 Full Page Tax Invoice (Epson L6460 / Inkjet)</option>
+                  <option value="A5">A5 Half Sheet Retail Bill (Epson L6460 / Inkjet)</option>
+                  <option value="58mm">58mm Thermal Roll (Portable / POS)</option>
+                  <option value="80mm">80mm Thermal Roll (Standard POS)</option>
                 </select>
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Product Label Paper Size</label>
+                <label className="mb-1 block text-[11px] font-medium text-text-secondary">Product Label Paper Size (DEV 632-L58P)</label>
                 <select
                   value={(form as any).label_size || '50x30mm'}
                   onChange={(e) => setForm({ ...form, label_size: e.target.value } as any)}
@@ -276,9 +278,26 @@ export default function SettingsPage() {
             <div className="pt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
+                onClick={() => {
+                  const fmt = (form as any).receipt_width || 'A4';
+                  window.open(`/api/printer/sample-invoice?format=${fmt}`, '_blank');
+                  toast.success(`Opening sample ${fmt} invoice for Epson L6460!`);
+                }}
+                className="w-full rounded-md border border-emerald-500/40 bg-emerald-500/10 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-1.5"
+              >
+                📄 Sample Invoice (L6460)
+              </button>
+
+              <button
+                type="button"
                 onClick={async () => {
                   try {
-                    const width = (form as any).receipt_width || '80mm';
+                    const width = (form as any).receipt_width || '58mm';
+                    if (width === 'A4' || width === 'A5') {
+                      window.open(`/api/printer/sample-invoice?format=${width}`, '_blank');
+                      toast.success(`Opening sample ${width} invoice preview!`);
+                      return;
+                    }
                     try {
                       await api.post(`/printer/test-receipt?paper_width=${width}`);
                     } catch {

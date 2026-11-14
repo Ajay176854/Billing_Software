@@ -422,39 +422,57 @@ export default function POS() {
       payment_method: saleData.payment_method || paymentMethod,
     } : undefined;
 
+    const triggerIframePrint = (url: string) => {
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+
+      const token = localStorage.getItem('token');
+      const separator = url.includes('?') ? '&' : '?';
+      printFrame.src = `${url}${token ? `${separator}token=${encodeURIComponent(token)}` : ''}`;
+      printFrame.onload = () => {
+        setTimeout(() => {
+          try {
+            printFrame.contentWindow?.focus();
+            printFrame.contentWindow?.print();
+          } finally {
+            setTimeout(() => {
+              if (document.body.contains(printFrame)) {
+                document.body.removeChild(printFrame);
+              }
+            }, 1000);
+          }
+        }, 300);
+      };
+    };
+
     try {
       // 1. Direct hardware print via current API endpoint
-      await api.post(`/printer/print-receipt/${saleId}`, payload);
+      const res = await api.post(`/printer/print-receipt/${saleId}`, payload);
+      if (res.data?.printer_type === 'document' && res.data?.invoice_url) {
+        triggerIframePrint(res.data.invoice_url);
+        toast.success(`Printing invoice to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})...`);
+        return;
+      }
       toast.success("Printed receipt directly to thermal printer!");
     } catch {
       try {
         // 2. Fallback to explicit localhost:8000
-        await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`, payload);
+        const res = await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${saleId}`, payload);
+        if (res.data?.printer_type === 'document' && res.data?.invoice_url) {
+          triggerIframePrint(res.data.invoice_url);
+          toast.success(`Printing invoice to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})...`);
+          return;
+        }
         toast.success("Printed receipt directly to thermal printer!");
       } catch (err: any) {
         // 3. Fallback: print inside the current app window using hidden iframe (stays inside software)
-        const printFrame = document.createElement('iframe');
-        printFrame.style.position = 'fixed';
-        printFrame.style.right = '0';
-        printFrame.style.bottom = '0';
-        printFrame.style.width = '0';
-        printFrame.style.height = '0';
-        printFrame.style.border = '0';
-        document.body.appendChild(printFrame);
-
-        const token = localStorage.getItem('token');
-        const printUrl = `/api/billing/invoice/${saleId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-        printFrame.src = printUrl;
-        printFrame.onload = () => {
-          setTimeout(() => {
-            try {
-              printFrame.contentWindow?.focus();
-              printFrame.contentWindow?.print();
-            } finally {
-              setTimeout(() => document.body.removeChild(printFrame), 1000);
-            }
-          }, 300);
-        };
+        triggerIframePrint(`/api/billing/invoice/${saleId}`);
       }
     }
   };

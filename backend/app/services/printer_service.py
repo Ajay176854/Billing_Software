@@ -35,6 +35,16 @@ def get_default_printer_name() -> Optional[str]:
         return printers[0] if printers else None
 
 
+def is_document_printer(printer_name: Optional[str] = None) -> bool:
+    """
+    Check if the target printer is an office/document printer (e.g. Epson EcoTank L6460, Laser, Inkjet)
+    instead of a thermal receipt roll printer.
+    """
+    p = str(printer_name or get_default_printer_name() or "").lower()
+    doc_keywords = ["epson", "l6460", "hp", "canon", "brother", "laser", "inkjet", "deskjet", "ecotank", "pdf", "onenote", "office"]
+    return any(k in p for k in doc_keywords)
+
+
 def send_raw_to_printer(raw_data: bytes, printer_name: Optional[str] = None) -> bool:
     """Send raw binary command bytes directly to the Windows printer spooler."""
     if not HAS_WIN32PRINT:
