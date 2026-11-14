@@ -588,10 +588,14 @@ def build_escpos_receipt_native(
     data += ALIGN_CENTER
     footer = "Thank You For Shopping!"
     data += footer.encode('ascii', errors='replace') + LF
-    data += LF + LF + LF
+    data += LF + LF
 
-    # Partial cut
-    data += CUT
+    # Cut only for 80mm printers with auto-cutter.
+    # 58mm portable printers (like SEZNIK) use a manual serrated tear bar; sending CUT causes them to feed paper endlessly!
+    if is_80mm:
+        data += LF + CUT
+    else:
+        data += LF + LF  # Extra feed so paper clears the manual tear bar
 
     return bytes(data)
 
@@ -791,10 +795,10 @@ def build_escpos_receipt(
     store_address: str = "",
     store_phone: str = "",
     currency_symbol: str = "Rs.",
-    paper_width: str = "80mm",
+    paper_width: str = "58mm",
 ) -> bytes:
-    """Generate standard TSPL bytes."""
-    return build_tspl_receipt(
+    """Generate standard ESC/POS bytes."""
+    return build_escpos_receipt_native(
         invoice_no=invoice_no,
         items=items,
         subtotal=subtotal,
