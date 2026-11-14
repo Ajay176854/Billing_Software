@@ -139,12 +139,16 @@ def _perform_update(download_url: str, target_version: str = "1.0.2"):
                 update_progress["downloaded_mb"] = dl_mb
                 update_progress["message"] = f"Downloading: {pct}% ({dl_mb} MB / {total_mb} MB)"
 
-        # Critical Integrity Check: Ensure binary is fully downloaded (at least 70 MB)
+            # Ensure all bytes are written to physical disk before proceeding
+            out_file.flush()
+            os.fsync(out_file.fileno())
+
+        # Critical Integrity Check: Ensure binary is fully downloaded without corruption
         actual_size = temp_exe.stat().st_size
-        if (total_size > 0 and actual_size < (total_size * 0.98)) or actual_size < 70 * 1024 * 1024:
+        if (total_size > 0 and actual_size != total_size) or actual_size < 70 * 1024 * 1024:
             if temp_exe.exists():
                 temp_exe.unlink()
-            raise RuntimeError(f"Download was incomplete ({round(actual_size / (1024 * 1024), 1)} MB). Update cancelled to prevent corruption.")
+            raise RuntimeError(f"Download was incomplete ({actual_size} bytes / expected {total_size} bytes). Update cancelled to prevent corruption.")
 
         update_progress["state"] = "applying"
         update_progress["percent"] = 100
@@ -157,17 +161,19 @@ def _perform_update(download_url: str, target_version: str = "1.0.2"):
         clean_version = target_version.lstrip("v").strip()
         with open(batch_script, "w", encoding="utf-8") as f:
             f.write(f"""@echo off
-timeout /t 3 /nobreak > nul
+timeout /t 2 /nobreak > nul
 :waitloop
-taskkill /F /PID {current_pid} > nul 2>&1
-timeout /t 1 /nobreak > nul
+taskkill /F /PID {current_pid} /T > nul 2>&1
+taskkill /F /IM MoiraLuxe.exe /T > nul 2>&1
+timeout /t 2 /nobreak > nul
 move /Y "{temp_exe}" "{target_exe}" > nul 2>&1
 if errorlevel 1 (
-    timeout /t 1 /nobreak > nul
+    timeout /t 2 /nobreak > nul
     goto waitloop
 )
 echo {clean_version} > "{app_dir}\\version.txt"
 timeout /t 1 /nobreak > nul
+cd /d "{app_dir}"
 start "" "{target_exe}"
 del "%~f0"
 """)
