@@ -1,13 +1,33 @@
 """
 Billing Software Backend - Application Configuration
 """
+import sys
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
+
+
+def get_current_app_version() -> str:
+    """Read dynamic version from version.txt if present, or fallback to current release."""
+    try:
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent
+        else:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+        v_file = base_dir / "version.txt"
+        if v_file.exists():
+            v = v_file.read_text(encoding="utf-8").strip()
+            if v:
+                return v
+    except Exception:
+        pass
+    return "1.0.2"
 
 
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Retail Billing & Inventory Management"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = get_current_app_version()
     DEBUG: bool = False
 
     # Database - Default to local SQLite, override in .env for production

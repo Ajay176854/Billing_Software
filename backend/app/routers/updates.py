@@ -9,7 +9,7 @@ import urllib.request
 import subprocess
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.config import settings
+from app.config import settings, get_current_app_version
 
 router = APIRouter(prefix="/updates", tags=["Updates"])
 
@@ -41,16 +41,17 @@ def check_for_updates():
         with urllib.request.urlopen(req, timeout=6.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
+        current_version = get_current_app_version()
+        current_ver_tuple = parse_version(current_version)
         latest_tag = data.get("tag_name", "")
         latest_ver_tuple = parse_version(latest_tag)
-        current_ver_tuple = parse_version(settings.APP_VERSION)
 
         # Detect if running in cloud/serverless environment (e.g. Vercel / AWS Lambda)
         is_cloud = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"))
         if is_cloud:
             return {
                 "update_available": False,
-                "current_version": settings.APP_VERSION,
+                "current_version": current_version,
                 "latest_version": latest_tag.lstrip("v"),
                 "is_cloud": True,
             }
@@ -66,7 +67,7 @@ def check_for_updates():
 
         return {
             "update_available": update_available,
-            "current_version": settings.APP_VERSION,
+            "current_version": current_version,
             "latest_version": latest_tag.lstrip("v"),
             "release_name": data.get("name") or latest_tag,
             "release_notes": data.get("body") or "",
@@ -99,7 +100,7 @@ def get_update_progress():
     return update_progress
 
 
-def _perform_update(download_url: str):
+def _perform_update(download_url: str, target_version: str = "1.0.2"):
     """Download the new executable using high-speed 1MB buffers and restart."""
     global update_progress
     try:
@@ -122,11 +123,11 @@ def _perform_update(download_url: str):
             headers={"User-Agent": "MoiraLuxe-POS"}
         )
 
-        with urllib.request.urlopen(req, timeout=120) as response, open(temp_exe, "wb") as out_file:
+        with urllib.request.urlopen(req, timeout=180) as response, open(temp_exe, "wb") as out_file:
             total_size = int(response.headers.get("content-length", 0))
-            total_mb = round(total_size / (1024 * 1024), 1) if total_size else 78.4
+            total_mb = round(total_size / (1024 * 1024), 1) if total_size else 78.5
             update_progress["total_mb"] = total_mb
-            
+
             # High-performance 1 MB buffer chunk for 3x faster transfer
             CHUNK_SIZE = 1024 * 1024
             downloaded = 0
@@ -139,10 +140,17 @@ def _perform_update(download_url: str):
                 downloaded += len(chunk)
                 dl_mb = round(downloaded / (1024 * 1024), 1)
                 pct = int((downloaded / total_size) * 100) if total_size else min(95, int(dl_mb))
-                
+
                 update_progress["percent"] = pct
                 update_progress["downloaded_mb"] = dl_mb
                 update_progress["message"] = f"Downloading: {pct}% ({dl_mb} MB / {total_mb} MB)"
+
+        # Critical Integrity Check: Ensure binary is fully downloaded (at least 70 MB)
+        actual_size = temp_exe.stat().st_size
+        if (total_size > 0 and actual_size < (total_size * 0.98)) or actual_size < 70 * 1024 * 1024:
+            if temp_exe.exists():
+                temp_exe.unlink()
+            raise RuntimeError(f"Download was incomplete ({round(actual_size / (1024 * 1024), 1)} MB). Update cancelled to prevent corruption.")
 
         update_progress["state"] = "applying"
         update_progress["percent"] = 100
@@ -150,18 +158,22 @@ def _perform_update(download_url: str):
 
         current_pid = os.getpid()
 
-        # Generate the self-replacing updater batch script
+        # Generate the self-replacing updater batch script with safety timeouts
         batch_script = app_dir / "apply_update.bat"
+        clean_version = target_version.lstrip("v").strip()
         with open(batch_script, "w", encoding="utf-8") as f:
             f.write(f"""@echo off
-timeout /t 1 /nobreak > nul
+timeout /t 3 /nobreak > nul
 :waitloop
 taskkill /F /PID {current_pid} > nul 2>&1
+timeout /t 1 /nobreak > nul
 move /Y "{temp_exe}" "{target_exe}" > nul 2>&1
 if errorlevel 1 (
     timeout /t 1 /nobreak > nul
     goto waitloop
 )
+echo {clean_version} > "{app_dir}\\version.txt"
+timeout /t 1 /nobreak > nul
 start "" "{target_exe}"
 del "%~f0"
 """)
@@ -200,7 +212,8 @@ def apply_update(background_tasks: BackgroundTasks):
     if not download_url:
         raise HTTPException(status_code=400, detail="No executable download URL found for this release.")
 
+    target_ver = info.get("latest_version") or "1.0.2"
     # Schedule the download and swap in the background so the HTTP response finishes cleanly
-    background_tasks.add_task(_perform_update, download_url)
+    background_tasks.add_task(_perform_update, download_url, target_ver)
     return {"success": True, "message": "Update process initiated. The app will restart shortly."}
 
