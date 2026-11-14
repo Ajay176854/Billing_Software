@@ -457,6 +457,145 @@ def build_tspl_receipt(
     return "\r\n".join(commands).encode("ascii", errors="replace")
 
 
+def build_escpos_receipt_native(
+    invoice_no: str,
+    items: list,
+    subtotal: float,
+    discount: float,
+    total: float,
+    store_name: str = "MOIRA LUXE",
+    store_address: str = "Thuckalay",
+    store_phone: str = "8438353504",
+    currency_symbol: str = "Rs.",
+    paper_width: str = "58mm",
+    created_at: Optional[str] = None,
+    payment_method: Optional[str] = None,
+) -> bytes:
+    """
+    Generate standard ESC/POS command bytes for thermal receipt printers.
+    Works natively on DEV 632, Xprinter XP-80, XP-58, and all ESC/POS compatible receipt printers.
+    """
+    ESC = b'\x1b'
+    GS = b'\x1d'
+    LF = b'\x0a'
+
+    # Standard ESC/POS commands
+    INIT = ESC + b'\x40'                    # Initialize printer
+    ALIGN_CENTER = ESC + b'\x61\x01'        # Center alignment
+    ALIGN_LEFT = ESC + b'\x61\x00'          # Left alignment
+    BOLD_ON = ESC + b'\x45\x01'             # Bold on
+    BOLD_OFF = ESC + b'\x45\x00'            # Bold off
+    DOUBLE_ON = GS + b'\x21\x11'            # Double width + double height
+    DOUBLE_OFF = GS + b'\x21\x00'           # Normal size
+    DOUBLE_W = GS + b'\x21\x10'             # Double width only
+    CUT = GS + b'\x56\x42\x03'             # Partial cut with 3-dot feed
+
+    clean_store = (store_name or "MOIRA LUXE").replace('"', '').strip()
+    address = (store_address or "Thuckalay").replace('"', '').strip()
+    phone = (store_phone or "8438353504").replace('"', '').strip()
+    clean_inv = str(invoice_no).replace('"', '').strip()
+    pay_mode = (payment_method or "CASH").upper().strip()
+    curr = "Rs."
+
+    is_80mm = "80" in str(paper_width)
+    col_width = 42 if is_80mm else 32  # characters per line
+
+    # Current date/time in IST
+    if created_at:
+        date_str = str(created_at)
+    else:
+        from datetime import timezone, timedelta
+        IST = timezone(timedelta(hours=5, minutes=30))
+        date_str = datetime.now(IST).strftime("%d-%m-%Y  %I:%M %p")
+
+    sep = "-" * col_width
+
+    data = bytearray()
+    data += INIT
+
+    # === Store Header (Centered, Bold, Double Size) ===
+    data += ALIGN_CENTER
+    data += DOUBLE_ON + BOLD_ON
+    data += clean_store.encode('ascii', errors='replace') + LF
+    data += DOUBLE_OFF + BOLD_OFF
+
+    # Address & Phone
+    sub_info = f"{address} - {phone}".strip(" -")
+    data += sub_info.encode('ascii', errors='replace') + LF
+    data += LF
+
+    # === Bill Meta ===
+    data += ALIGN_LEFT
+    data += sep.encode('ascii') + LF
+    data += f"Bill No: {clean_inv}".encode('ascii', errors='replace') + LF
+    data += f"Date   : {date_str}".encode('ascii', errors='replace') + LF
+    data += f"Payment: {pay_mode}".encode('ascii', errors='replace') + LF
+    data += sep.encode('ascii') + LF
+
+    # === Items Table Header ===
+    if is_80mm:
+        header_line = f"{'ITEM':<20} {'QTY':>5} {'AMOUNT':>13}"
+    else:
+        header_line = f"{'ITEM':<14} {'QTY':>4} {'AMOUNT':>10}"
+    data += BOLD_ON
+    data += header_line.encode('ascii', errors='replace') + LF
+    data += BOLD_OFF
+    data += sep.encode('ascii') + LF
+
+    # === Items ===
+    for item in items:
+        raw_name = str(item.get("name", "Item")).replace('"', '').strip()
+        qty = item.get("quantity", 1)
+        price = float(item.get("price", 0))
+
+        if is_80mm:
+            name_part = raw_name[:20]
+            item_line = f"{name_part:<20} {qty:>5} {price:>13.2f}"
+        else:
+            name_part = raw_name[:14]
+            item_line = f"{name_part:<14} {qty:>4} {price:>10.2f}"
+
+        data += item_line.encode('ascii', errors='replace') + LF
+
+        # Second line for long names
+        max_name = 20 if is_80mm else 14
+        if len(raw_name) > max_name:
+            rem_name = raw_name[max_name:max_name * 2]
+            data += f" {rem_name}".encode('ascii', errors='replace') + LF
+
+    # === Totals ===
+    data += sep.encode('ascii') + LF
+
+    sub_line = f"{'Subtotal:':<15} {curr}{subtotal:>11.2f}"
+    data += sub_line.encode('ascii', errors='replace') + LF
+
+    if discount and float(discount) > 0:
+        disc_line = f"{'Discount:':<15}-{curr}{float(discount):>10.2f}"
+        data += disc_line.encode('ascii', errors='replace') + LF
+
+    data += sep.encode('ascii') + LF
+
+    # Grand Total (Bold, Double Width)
+    data += BOLD_ON + DOUBLE_W
+    tot_line = f"TOTAL: {curr}{total:>11.2f}"
+    data += tot_line.encode('ascii', errors='replace') + LF
+    data += DOUBLE_OFF + BOLD_OFF
+
+    data += sep.encode('ascii') + LF
+
+    # === Footer (Centered) ===
+    data += LF
+    data += ALIGN_CENTER
+    footer = "Thank You For Shopping!"
+    data += footer.encode('ascii', errors='replace') + LF
+    data += LF + LF + LF
+
+    # Partial cut
+    data += CUT
+
+    return bytes(data)
+
+
 def print_receipt_direct(
     invoice_no: str,
     items: list,
@@ -473,10 +612,10 @@ def print_receipt_direct(
     payment_method: Optional[str] = None,
 ) -> bool:
     """
-    Direct TSPL hardware print to the user's DEV 632 / Xprinter / thermal receipt printer.
-    Fast, crisp, 100% visible amounts, and stops immediately without wasting paper.
+    Direct ESC/POS hardware print to the user's DEV 632 / Xprinter thermal receipt printer.
+    Sends standard ESC/POS commands that all receipt printers understand.
     """
-    raw_data = build_tspl_receipt(
+    raw_data = build_escpos_receipt_native(
         invoice_no=invoice_no,
         items=items,
         subtotal=subtotal,

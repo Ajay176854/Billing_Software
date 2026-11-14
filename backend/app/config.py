@@ -57,7 +57,7 @@ def get_current_app_version() -> str:
     except Exception:
         pass
 
-    return "1.0.4"
+    return "1.0.5"
 
 
 class Settings(BaseSettings):
