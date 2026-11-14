@@ -45,6 +45,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
   const [showQr, setShowQr] = useState(false);
   const [showStoreHeader, setShowStoreHeader] = useState(true);
   const [copies, setCopies] = useState(1);
+  const [enabledTags, setEnabledTags] = useState<[boolean, boolean, boolean]>([true, true, true]);
   const [storeName, setStoreName] = useState(() => {
     return localStorage.getItem('store_name') || 'Moira Luxe';
   });
@@ -76,6 +77,10 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             ? { width: 40, height: 30 }
             : { width: 50, height: 30 };
 
+      const activeCols = enabledTags
+        .map((on, idx) => (on ? idx : -1))
+        .filter((idx) => idx !== -1);
+
       const payload = {
         product_name: productName,
         barcode: productCode,
@@ -88,6 +93,7 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
         show_price: showPrice,
         show_header: showStoreHeader,
         show_qr: showQr,
+        enabled_columns: isTagging ? activeCols : undefined,
       };
 
       // Send directly to local FastAPI server via configured api client
@@ -272,82 +278,178 @@ const ProductLabelModal: React.FC<ProductLabelModalProps> = ({
             {isTagging ? (
               /* Specialized Seznik 14.3mm x 100mm 3-Up Jewellery Dumbbell Tags Preview */
               <div className="flex flex-col items-center w-full">
-                <div className="flex items-center gap-1.5 mb-2.5 px-3 py-1 bg-amber-100/80 border border-amber-300 rounded-full text-amber-900 text-[10px] font-bold">
-                  <span>✨ 3-Up Jewellery Tags: 3 Stickers per row with Instant 360° QR Scanning</span>
+                {/* Active Stickers Selector Bar & Paper Waste Control */}
+                <div className="flex flex-wrap items-center justify-between w-full mb-3 px-1 gap-2 bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                    <span className="text-amber-700">🏷️ Active Stickers:</span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+                      {enabledTags.filter(Boolean).length} of 3 Selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-amber-200 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setEnabledTags([true, true, true])}
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
+                        enabledTags.every(Boolean)
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      All 3
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnabledTags([true, false, false])}
+                      title="Turn off Middle and Right stickers (Left only)"
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
+                        enabledTags[0] && !enabledTags[1] && !enabledTags[2]
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      Left Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnabledTags([false, true, false])}
+                      title="Turn off Left and Right stickers (Middle only)"
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
+                        !enabledTags[0] && enabledTags[1] && !enabledTags[2]
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      Middle Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnabledTags([false, false, true])}
+                      title="Turn off Left and Middle stickers (Right only)"
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
+                        !enabledTags[0] && !enabledTags[1] && enabledTags[2]
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      Right Only
+                    </button>
+                  </div>
                 </div>
+
                 <div
                   ref={printRef}
                   className="w-full flex justify-center items-start gap-2.5 py-2 px-2 bg-slate-100/70 border-2 border-dashed border-amber-300 rounded-xl overflow-x-auto"
                 >
-                  {[0, 1, 2].map((idx) => (
-                    <div
-                      key={idx}
-                      className="w-[122px] shrink-0 flex flex-col items-center bg-white border border-amber-300 rounded-lg shadow-xs overflow-hidden"
-                    >
-                      {/* Flap: Divided into Front Face and Back Face with Solid Center Divider | */}
-                      <div className="w-full bg-amber-50/40 p-1.5 flex flex-col items-center">
-                        <span className="text-[7.5px] uppercase tracking-wider text-amber-900 font-bold bg-amber-200/80 px-1.5 py-0.2 rounded mb-1">
-                          {idx === 0 ? 'Left' : idx === 1 ? 'Center' : 'Right'} #{idx + 1}
-                        </span>
-
-                        {/* Part 1: Front Face Details (Line 1: Store Name, Line 2: Product Name, Line 3: Price) */}
-                        <div className="w-full text-center py-0.5">
-                          {showStoreHeader && storeName && (
-                            <div className="text-[9px] font-bold text-gray-800 leading-tight uppercase tracking-wider truncate">
-                              {storeName}
-                            </div>
-                          )}
-                          <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate mt-0.5">
-                            {productName}
-                          </div>
-                          {showPrice && price !== undefined && (
-                            <div className="text-[9.5px] font-extrabold text-emerald-700 mt-0.5">
-                              {currencySymbol} {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Fold Guide Line */}
-                        <div className="w-full my-1 relative flex items-center justify-between px-0.5">
-                          <div className="w-2 border-t-2 border-amber-600" />
-                          <span className="text-[6.5px] font-bold text-amber-700 uppercase tracking-widest">
-                            Fold
+                  {[0, 1, 2].map((idx) => {
+                    const isEnabled = enabledTags[idx];
+                    return (
+                      <div
+                        key={idx}
+                        className={`w-[122px] shrink-0 flex flex-col items-center bg-white border rounded-lg shadow-xs overflow-hidden transition-all duration-200 ${
+                          isEnabled
+                            ? 'border-amber-400 ring-2 ring-amber-400/30'
+                            : 'border-slate-300 opacity-40 grayscale bg-slate-100'
+                        }`}
+                      >
+                        {/* Top Enable / Disable Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...enabledTags] as [boolean, boolean, boolean];
+                            next[idx] = !next[idx];
+                            if (!next.some(Boolean)) {
+                              toast.error('At least one sticker must be enabled!');
+                              return;
+                            }
+                            setEnabledTags(next);
+                          }}
+                          className={`w-full py-1 px-1.5 text-[8.5px] font-black transition-all flex items-center justify-between border-b cursor-pointer ${
+                            isEnabled
+                              ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-500'
+                              : 'bg-slate-300 text-slate-700 border-slate-400 hover:bg-slate-400'
+                          }`}
+                          title={isEnabled ? 'Click to disable (skip printing on this tag)' : 'Click to enable this tag'}
+                        >
+                          <span className="uppercase tracking-wider">
+                            {idx === 0 ? 'Left' : idx === 1 ? 'Middle' : 'Right'} #{idx + 1}
                           </span>
-                          <div className="w-2 border-t-2 border-amber-600" />
-                        </div>
+                          <span className={`text-[7px] px-1 py-0.2 rounded font-extrabold ${
+                            isEnabled ? 'bg-white text-emerald-800' : 'bg-slate-600 text-white'
+                          }`}>
+                            {isEnabled ? 'ON' : 'OFF'}
+                          </span>
+                        </button>
 
-                        {/* Part 2: Back Face 2D QR Code Tag (Jewellery Industry Standard) */}
-                        <div className="flex flex-col items-center justify-center w-full py-1">
-                          {productCode ? (
-                            <>
-                              <div className="p-0.5 bg-white border border-gray-200 rounded-xs shadow-2xs">
-                                <QRCodeSVG value={productCode} size={42} level="M" />
-                              </div>
-                              <span className="text-[7.5px] font-bold text-gray-800 mt-0.5 tracking-wider">
-                                {productCode}
+                        {/* Flap: Divided into Front Face and Back Face with Solid Center Divider | */}
+                        <div className="w-full bg-amber-50/40 p-1.5 flex flex-col items-center relative">
+                          {!isEnabled && (
+                            <div className="absolute inset-0 bg-slate-200/80 z-10 flex items-center justify-center">
+                              <span className="text-[8px] font-black uppercase tracking-wider text-slate-600 bg-white/90 border border-slate-400 px-1.5 py-0.5 rounded shadow-2xs rotate-[-12deg]">
+                                Blank (Skip)
                               </span>
-                            </>
-                          ) : (
-                            <span className="text-[7.5px] text-gray-400">No Code</span>
+                            </div>
                           )}
+
+                          {/* Part 1: Front Face Details (Line 1: Store Name, Line 2: Product Name, Line 3: Price) */}
+                          <div className="w-full text-center py-0.5">
+                            {showStoreHeader && storeName && (
+                              <div className="text-[9px] font-bold text-gray-800 leading-tight uppercase tracking-wider truncate">
+                                {storeName}
+                              </div>
+                            )}
+                            <div className="text-[9.5px] font-black text-black leading-tight uppercase truncate mt-0.5">
+                              {productName}
+                            </div>
+                            {showPrice && price !== undefined && (
+                              <div className="text-[9.5px] font-extrabold text-emerald-700 mt-0.5">
+                                {currencySymbol} {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/-
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Fold Guide Line */}
+                          <div className="w-full my-1 relative flex items-center justify-between px-0.5">
+                            <div className="w-2 border-t-2 border-amber-600" />
+                            <span className="text-[6.5px] font-bold text-amber-700 uppercase tracking-widest">
+                              Fold
+                            </span>
+                            <div className="w-2 border-t-2 border-amber-600" />
+                          </div>
+
+                          {/* Part 2: Back Face 2D QR Code Tag (Jewellery Industry Standard) */}
+                          <div className="flex flex-col items-center justify-center w-full py-1">
+                            {productCode ? (
+                              <>
+                                <div className="p-0.5 bg-white border border-gray-200 rounded-xs shadow-2xs">
+                                  <QRCodeSVG value={productCode} size={42} level="M" />
+                                </div>
+                                <span className="text-[7.5px] font-bold text-gray-800 mt-0.5 tracking-wider">
+                                  {productCode}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[7.5px] text-gray-400">No Code</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle Tail: Looping Strap */}
+                        <div className="w-[14px] h-8 my-1 border-x border-dashed border-amber-400 bg-amber-50/20 flex items-center justify-center relative">
+                          <span className="text-[6px] font-bold text-amber-700 rotate-90 whitespace-nowrap tracking-wider uppercase">
+                            Strap
+                          </span>
+                        </div>
+
+                        {/* Flap 2: Fold-Over Tab */}
+                        <div className="w-full p-1 border-t border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center text-center">
+                          <span className="text-[7px] text-gray-400 font-medium">
+                            Blank Fold-Over
+                          </span>
                         </div>
                       </div>
-
-                      {/* Middle Tail: Looping Strap */}
-                      <div className="w-[14px] h-8 my-1 border-x border-dashed border-amber-400 bg-amber-50/20 flex items-center justify-center relative">
-                        <span className="text-[6px] font-bold text-amber-700 rotate-90 whitespace-nowrap tracking-wider uppercase">
-                          Strap
-                        </span>
-                      </div>
-
-                      {/* Flap 2: Fold-Over Tab */}
-                      <div className="w-full p-1 border-t border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center text-center">
-                        <span className="text-[7px] text-gray-400 font-medium">
-                          Blank Fold-Over
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (

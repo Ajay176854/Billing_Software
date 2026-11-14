@@ -46,22 +46,15 @@ def check_for_updates():
         latest_tag = data.get("tag_name", "")
         latest_ver_tuple = parse_version(latest_tag)
 
-        # Detect if running in cloud/serverless environment (e.g. Vercel / AWS Lambda)
-        is_cloud = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"))
-        if is_cloud:
-            return {
-                "update_available": False,
-                "current_version": current_version,
-                "latest_version": latest_tag.lstrip("v"),
-                "is_cloud": True,
-            }
-
         # Find .exe asset
         exe_asset = None
         for asset in data.get("assets", []):
             if asset.get("name", "").lower().endswith(".exe"):
                 exe_asset = asset
                 break
+
+        # Detect if running in cloud/serverless environment (e.g. Vercel / AWS Lambda)
+        is_cloud = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"))
 
         update_available = latest_ver_tuple > current_ver_tuple and exe_asset is not None
 
@@ -73,6 +66,9 @@ def check_for_updates():
             "release_notes": data.get("body") or "",
             "download_url": exe_asset.get("browser_download_url") if exe_asset else None,
             "file_size_mb": round((exe_asset.get("size", 0) / (1024 * 1024)), 1) if exe_asset else 0,
+            "published_at": data.get("published_at"),
+            "is_cloud": is_cloud,
+        }
             "published_at": data.get("published_at"),
         }
     except Exception as e:
@@ -199,15 +195,17 @@ def apply_update(background_tasks: BackgroundTasks):
     """
     Download the latest update from GitHub and restart the application.
     """
-    # Guard against running on cloud/serverless hosts
-    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"):
-        raise HTTPException(
-            status_code=400,
-            detail="Auto-update is designed for the Windows desktop app (.exe). The cloud web version updates automatically via Git push.",
-        )
-
     info = check_for_updates()
     download_url = info.get("download_url")
+
+    # Guard against running on cloud/serverless hosts (return download URL directly)
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"):
+        return {
+            "success": True,
+            "status": "cloud",
+            "message": "Click to download the latest MoiraLuxe.exe installer",
+            "download_url": download_url,
+        }
 
     if not download_url:
         raise HTTPException(status_code=400, detail="No executable download URL found for this release.")

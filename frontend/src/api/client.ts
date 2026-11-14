@@ -2,8 +2,22 @@ import axios from 'axios';
 
 // Standard Axios instance for real-time inventory and billing operations
 // Direct, zero-staleness API communication guarantees live stock numbers across all pages
+// Determine correct base URL: on desktop or local server, always communicate with the local backend
+const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    if (
+      Boolean((window as any).pywebview) ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === 'localhost'
+    ) {
+      return '/api';
+    }
+  }
+  return import.meta.env.VITE_API_URL || '/api';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseURL(),
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -49,10 +49,24 @@ export default function UpdateNotification() {
     return null;
   }
 
+  const isDesktop = typeof window !== 'undefined' && (
+    Boolean((window as any).pywebview) ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === 'localhost'
+  );
+
   const handleApplyUpdate = async () => {
+    if (!isDesktop && updateInfo?.download_url) {
+      window.open(updateInfo.download_url, '_blank');
+      toast.success('Downloading MoiraLuxe.exe to your computer!');
+      setShowModal(false);
+      return;
+    }
+
     setIsUpdating(true);
-    setDownloadProgress({ percent: 5, downloaded_mb: 0, total_mb: updateInfo.file_size_mb || 78.4, message: 'Starting high-speed download...' });
+    setDownloadProgress({ percent: 5, downloaded_mb: 0, total_mb: updateInfo?.file_size_mb || 78.4, message: 'Starting high-speed download...' });
     try {
+      // Direct call to local desktop backend
       await api.post('/updates/apply');
       toast.success('High-speed download started!');
 
@@ -184,7 +198,11 @@ export default function UpdateNotification() {
               ) : (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>The update downloads in background and restarts seamlessly.</span>
+                  <span>
+                    {isDesktop
+                      ? "The update downloads in background and restarts seamlessly."
+                      : "Clicking below will download the latest MoiraLuxe.exe to your Downloads folder."}
+                  </span>
                 </div>
               )}
             </div>
@@ -203,7 +221,7 @@ export default function UpdateNotification() {
                   onClick={handleApplyUpdate}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 hover:from-indigo-500 hover:to-purple-500 transition-all active:scale-95"
                 >
-                  <DownloadCloud className="h-4 w-4" /> Install & Restart Now
+                  <DownloadCloud className="h-4 w-4" /> {isDesktop ? "Install & Restart Now" : "Download MoiraLuxe.exe"}
                 </button>
               </div>
             )}
