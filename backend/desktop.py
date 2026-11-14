@@ -105,7 +105,7 @@ def wait_for_server(base_url: str, timeout=35.0):
             write_startup_log("Server responded with HTTP status, server is alive.")
             return True, None
         except (URLError, socket.timeout):
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     if server_error_info:
         return False, server_error_info[0]

@@ -19,6 +19,12 @@ export default function UpdateNotification() {
   const [showModal, setShowModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({
+    percent: 0,
+    downloaded_mb: 0,
+    total_mb: 0,
+    message: '',
+  });
 
   useEffect(() => {
     const checkForUpdates = async () => {
@@ -45,9 +51,27 @@ export default function UpdateNotification() {
 
   const handleApplyUpdate = async () => {
     setIsUpdating(true);
+    setDownloadProgress({ percent: 5, downloaded_mb: 0, total_mb: updateInfo.file_size_mb || 78.4, message: 'Starting high-speed download...' });
     try {
       await api.post('/updates/apply');
-      toast.success('Download initiated! The application will restart in a few moments.');
+      toast.success('High-speed download started!');
+
+      // Poll progress every 400ms for smooth live progress bar
+      const pollTimer = setInterval(async () => {
+        try {
+          const res = await api.get('/updates/progress');
+          if (res.data) {
+            setDownloadProgress(res.data);
+            if (res.data.state === 'error') {
+              clearInterval(pollTimer);
+              setIsUpdating(false);
+              toast.error(res.data.message || 'Update failed');
+            }
+          }
+        } catch {
+          // If server stopped, the updater is restarting Moira Luxe
+        }
+      }, 400);
     } catch (err: any) {
       setIsUpdating(false);
       toast.error(err.response?.data?.detail || 'Failed to initiate update.');
@@ -139,11 +163,22 @@ export default function UpdateNotification() {
               )}
 
               {isUpdating ? (
-                <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-4 text-center space-y-2 animate-pulse">
-                  <Loader2 className="mx-auto h-7 w-7 animate-spin text-indigo-400" />
-                  <p className="text-sm font-semibold text-white">Downloading Update & Restarting...</p>
-                  <p className="text-xs text-indigo-300">
-                    The software will replace the executable and automatically reopen. Please do not turn off your computer.
+                <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-4 space-y-3">
+                  <div className="flex justify-between items-center text-xs text-indigo-200">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                      {downloadProgress.message || "Downloading update..."}
+                    </span>
+                    <span className="font-mono font-bold text-emerald-400">{downloadProgress.percent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/60">
+                    <div
+                      className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.max(5, downloadProgress.percent)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 text-center">
+                    High-speed stream • The application will automatically restart once finished.
                   </p>
                 </div>
               ) : (

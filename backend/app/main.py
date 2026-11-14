@@ -29,22 +29,27 @@ from app.utils.seed import seed_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create tables and seed data on startup."""
+    """Ensure data directory and non-blocking background initialization."""
     try:
         # Ensure data directory exists
         data_dir = Path(__file__).resolve().parent.parent / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Automatically create tables for the desktop app
-        from app.database import engine, Base
-        Base.metadata.create_all(bind=engine)
+        # Run database table check & seed in background so the app opens in < 1 second
+        import threading
+        def _init_db_background():
+            try:
+                from app.database import engine, Base
+                Base.metadata.create_all(bind=engine)
+                db = SessionLocal()
+                try:
+                    seed_database(db)
+                finally:
+                    db.close()
+            except Exception as ex:
+                print(f"Background DB check: {ex}")
 
-        # Seed default data
-        db = SessionLocal()
-        try:
-            seed_database(db)
-        finally:
-            db.close()
+        threading.Thread(target=_init_db_background, daemon=True).start()
     except Exception as e:
         # Ignore errors in serverless environments (like Vercel) where filesystem is read-only
         print(f"Lifespan startup warning: {e}")

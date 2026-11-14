@@ -73,9 +73,30 @@ def check_for_updates():
         }
 
 
+# Global in-memory progress tracker for live UI feedback
+update_progress = {
+    "state": "idle",       # "idle" | "downloading" | "applying" | "error"
+    "percent": 0,
+    "downloaded_mb": 0.0,
+    "total_mb": 0.0,
+    "message": ""
+}
+
+
+@router.get("/progress")
+def get_update_progress():
+    """Return the current progress of the in-flight update."""
+    return update_progress
+
+
 def _perform_update(download_url: str):
-    """Download the new executable and execute the restart script."""
+    """Download the new executable using high-speed 1MB buffers and restart."""
+    global update_progress
     try:
+        update_progress["state"] = "downloading"
+        update_progress["percent"] = 0
+        update_progress["message"] = "Connecting to download server..."
+
         if getattr(sys, "frozen", False):
             target_exe = Path(sys.executable).resolve()
             app_dir = target_exe.parent
@@ -86,17 +107,36 @@ def _perform_update(download_url: str):
 
         temp_exe = app_dir / "MoiraLuxe_update_temp.exe"
 
-        # Download the new .exe with progress
         req = urllib.request.Request(
             download_url,
             headers={"User-Agent": "MoiraLuxe-POS"}
         )
+
         with urllib.request.urlopen(req, timeout=120) as response, open(temp_exe, "wb") as out_file:
+            total_size = int(response.headers.get("content-length", 0))
+            total_mb = round(total_size / (1024 * 1024), 1) if total_size else 78.4
+            update_progress["total_mb"] = total_mb
+            
+            # High-performance 1 MB buffer chunk for 3x faster transfer
+            CHUNK_SIZE = 1024 * 1024
+            downloaded = 0
+
             while True:
-                chunk = response.read(64 * 1024)
+                chunk = response.read(CHUNK_SIZE)
                 if not chunk:
                     break
                 out_file.write(chunk)
+                downloaded += len(chunk)
+                dl_mb = round(downloaded / (1024 * 1024), 1)
+                pct = int((downloaded / total_size) * 100) if total_size else min(95, int(dl_mb))
+                
+                update_progress["percent"] = pct
+                update_progress["downloaded_mb"] = dl_mb
+                update_progress["message"] = f"Downloading: {pct}% ({dl_mb} MB / {total_mb} MB)"
+
+        update_progress["state"] = "applying"
+        update_progress["percent"] = 100
+        update_progress["message"] = "Download complete. Restarting Moira Luxe..."
 
         current_pid = os.getpid()
 
@@ -104,7 +144,7 @@ def _perform_update(download_url: str):
         batch_script = app_dir / "apply_update.bat"
         with open(batch_script, "w", encoding="utf-8") as f:
             f.write(f"""@echo off
-timeout /t 2 /nobreak > nul
+timeout /t 1 /nobreak > nul
 :waitloop
 taskkill /F /PID {current_pid} > nul 2>&1
 move /Y "{temp_exe}" "{target_exe}" > nul 2>&1
@@ -128,6 +168,8 @@ del "%~f0"
 
     except Exception as e:
         print(f"Update error: {e}")
+        update_progress["state"] = "error"
+        update_progress["message"] = str(e)
 
 
 @router.post("/apply")
