@@ -328,25 +328,7 @@ export default function POS() {
     const currentSubtotal = subtotal;
     const currentDiscount = totalDiscount;
 
-    // 1. OPTIMISTIC RECEIPT PRINT: Start printing immediately without waiting for server response
-    const optimisticInvoiceNo = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-PENDING`;
-    const receiptPayload = {
-      invoice_no: optimisticInvoiceNo,
-      items: currentCart.map((i) => ({
-        name: i.name || "Item",
-        quantity: i.quantity,
-        price: i.price * i.quantity - i.discount,
-      })),
-      subtotal: currentSubtotal,
-      discount: currentDiscount,
-      total: currentTotal,
-      payment_method: paymentMethod,
-    };
-
-    // Fire hardware print to local spooler right now
-    directPrintReceipt(0, receiptPayload);
-
-    // 2. Clear cart and reset UI immediately so cashier can scan next customer
+    // 1. Clear cart and reset UI immediately so cashier can scan next customer
     for (const item of currentCart) {
       const prod = catalogRef.current.idMap.get(item.product_id);
       if (prod) {
@@ -378,7 +360,7 @@ export default function POS() {
 
     setProcessing(true);
     try {
-      // 3. Sync to Supabase in background
+      // 2. Sync to Supabase to obtain official invoice number
       const res = await api.post('/billing/complete', {
         items: currentCart.map((i) => ({ product_id: i.product_id, quantity: i.quantity, discount: i.discount })),
         payment_method: paymentMethod,
@@ -388,6 +370,21 @@ export default function POS() {
         customer_place: savedCustomerPlace || undefined,
         customer_email: savedCustomerEmail || undefined,
       });
+
+      // 3. Print receipt with the confirmed official invoice number
+      const receiptPayload = {
+        invoice_no: res.data.invoice_no,
+        items: currentCart.map((i) => ({
+          name: i.name || "Item",
+          quantity: i.quantity,
+          price: i.price * i.quantity - i.discount,
+        })),
+        subtotal: currentSubtotal,
+        discount: currentDiscount,
+        total: currentTotal,
+        payment_method: paymentMethod,
+      };
+      directPrintReceipt(res.data.id, receiptPayload);
 
       // Update dialog with official invoice number and ID
       setCompletedSale((prev) => prev ? {
