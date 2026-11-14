@@ -38,8 +38,8 @@ class QueryCacheMiddleware(BaseHTTPMiddleware):
         if method != "GET":
             return await call_next(request)
 
-        # Never cache auth or printer or backup endpoints
-        if any(skip in path for skip in ["auth", "health", "printer", "backup"]):
+        # Never cache auth or printer or backup or updates endpoints
+        if any(skip in path for skip in ["auth", "health", "printer", "backup", "updates"]):
             return await call_next(request)
 
         # Cache key based on endpoint and query parameters

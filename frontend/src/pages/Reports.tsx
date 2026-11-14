@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import api from '../api/client';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { BarChart3, Download, X, Phone, MapPin, Mail, ShoppingBag, ChevronRight, FileSpreadsheet, FileText, Search } from 'lucide-react';
+import { BarChart3, X, Phone, MapPin, Mail, ShoppingBag, ChevronRight, FileSpreadsheet, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Pagination from '../components/Pagination';
 
@@ -361,7 +361,7 @@ export default function Reports() {
           ref: 'A1',
           headerRow: true,
           totalsRow: true,
-          style: { theme: 'TableStyleMedium9', showRowStripes: true },
+          style: { theme: 'TableStyleMedium7', showRowStripes: true },
           columns: [
             { name: 'Product Name', filterButton: true },
             { name: 'Barcode', filterButton: true },
@@ -420,37 +420,40 @@ export default function Reports() {
         return;
       }
 
-      const headers = [
-        'Product Name',
-        'Barcode',
-        'SKU',
-        'Category',
-        'Stock Qty',
-        'Unit',
-        'Buy Price (Rs)',
-        'Sell Price (Rs)',
-        'Margin (%)',
-        'Stock Cost Value (Rs)',
-        'Stock Retail Value (Rs)',
-        'Units Sold',
-        'Sales Revenue (Rs)',
-        'Sales Profit (Rs)',
-        'Status'
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'MOIRA LUXE';
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet('Product Inventory', {
+        views: [{ showGridLines: true }]
+      });
+
+      // Columns with generous auto-widths and currency formatting matching professional table styling
+      ws.columns = [
+        { header: 'Product Name', key: 'product_name', width: 34 },
+        { header: 'Barcode', key: 'barcode', width: 18 },
+        { header: 'SKU', key: 'sku', width: 16 },
+        { header: 'Category', key: 'category_name', width: 22 },
+        { header: 'Stock Qty', key: 'stock_qty', width: 14, style: { numFmt: '#,##0' } },
+        { header: 'Unit', key: 'unit', width: 10 },
+        { header: 'Buy Price', key: 'purchase_price', width: 16, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Sell Price', key: 'selling_price', width: 16, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Margin %', key: 'margin_pct', width: 14, style: { numFmt: '0.00"%"' } },
+        { header: 'Stock Cost Value', key: 'stock_cost_value', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Stock Retail Value', key: 'stock_retail_value', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Units Sold', key: 'units_sold', width: 14, style: { numFmt: '#,##0' } },
+        { header: 'Sales Revenue', key: 'revenue', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Sales Profit', key: 'profit', width: 18, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Status', key: 'status', width: 12 },
       ];
 
-      const escapeCSV = (val: any) => {
-        if (val === null || val === undefined) return '""';
-        const str = String(val).replace(/"/g, '""');
-        return `"${str}"`;
-      };
-
       const rows = inventoryData.map(d => [
-        escapeCSV(d.product_name),
-        escapeCSV(d.barcode || ''),
-        escapeCSV(d.sku || ''),
-        escapeCSV(d.category_name),
+        d.product_name,
+        d.barcode || '-',
+        d.sku || '-',
+        d.category_name,
         d.stock_qty,
-        escapeCSV(d.unit),
+        d.unit,
         d.purchase_price,
         d.selling_price,
         d.margin_pct,
@@ -459,29 +462,65 @@ export default function Reports() {
         d.units_sold,
         d.revenue,
         d.profit,
-        escapeCSV(d.status)
-      ].join(','));
+        (d.status || 'ACTIVE').toUpperCase(),
+      ]);
 
-      const csvContent = '\uFEFF' + [headers.map(escapeCSV).join(','), ...rows].join('\r\n');
-      const filename = `Product_Inventory_Report_${new Date().toISOString().split('T')[0]}.csv`;
+      // Green table theme TableStyleMedium7 with zebra striping, filter arrows and totals row
+      ws.addTable({
+        name: 'ProductInventoryTable',
+        ref: 'A1',
+        headerRow: true,
+        totalsRow: true,
+        style: { theme: 'TableStyleMedium7', showRowStripes: true },
+        columns: [
+          { name: 'Product Name', filterButton: true },
+          { name: 'Barcode', filterButton: true },
+          { name: 'SKU', filterButton: true },
+          { name: 'Category', filterButton: true },
+          { name: 'Stock Qty', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Unit', filterButton: true },
+          { name: 'Buy Price', filterButton: true },
+          { name: 'Sell Price', filterButton: true },
+          { name: 'Margin %', filterButton: true, totalsRowFunction: 'average' },
+          { name: 'Stock Cost Value', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Stock Retail Value', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Units Sold', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Sales Revenue', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Sales Profit', filterButton: true, totalsRowFunction: 'sum' },
+          { name: 'Status', filterButton: true },
+        ],
+        rows: rows,
+      });
+
+      // Style Header: bold white text
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.height = 24;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = `Product_Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
 
       // @ts-ignore
       if (window.pywebview && window.pywebview.api && window.pywebview.api.save_excel) {
-        // Safe base64 encoding with UTF-8 support
-        const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i += 8192) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192)));
+        }
+        const base64 = btoa(binary);
         // @ts-ignore
         const saved = await window.pywebview.api.save_excel(base64, filename);
         if (saved) {
-          toast.success('CSV Report saved successfully!');
+          toast.success('Product Report saved successfully!');
         }
       } else {
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         saveAs(blob, filename);
-        toast.success('CSV Report downloaded!');
+        toast.success('Product Report downloaded!');
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('CSV Export failed: ' + (err.message || 'Unknown error'));
+      toast.error('Export failed: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -509,10 +548,10 @@ export default function Reports() {
           <button
             onClick={exportToCSV}
             disabled={loading}
-            title="Export full product inventory report as CSV spreadsheet"
+            title="Export full product inventory report with professional green table styling (.xlsx)"
             className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3.5 py-2 text-sm font-medium text-text-primary transition-all hover:border-emerald-500 hover:text-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FileText className="h-4 w-4 text-emerald-500" /> Export CSV
+            <FileSpreadsheet className="h-4 w-4 text-emerald-500" /> Export Products
           </button>
           <button
             onClick={exportToExcel}
@@ -520,7 +559,7 @@ export default function Reports() {
             title="Export comprehensive multi-sheet Excel workbook (.xlsx)"
             className="flex items-center gap-2 rounded-lg border border-border bg-accent text-white px-4 py-2 text-sm font-medium transition-all hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            <FileSpreadsheet className="h-4 w-4" /> Export Excel
+            <FileSpreadsheet className="h-4 w-4" /> Full Workbook
           </button>
         </div>
       </div>

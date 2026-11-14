@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 import NetworkStatus from './components/NetworkStatus';
+import UpdateNotification from './components/UpdateNotification';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
@@ -20,6 +21,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <NetworkStatus />
+        <UpdateNotification />
         <Toaster
           position="top-right"
           toastOptions={{
