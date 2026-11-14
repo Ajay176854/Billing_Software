@@ -45,6 +45,16 @@ def check_for_updates():
         latest_ver_tuple = parse_version(latest_tag)
         current_ver_tuple = parse_version(settings.APP_VERSION)
 
+        # Detect if running in cloud/serverless environment (e.g. Vercel / AWS Lambda)
+        is_cloud = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"))
+        if is_cloud:
+            return {
+                "update_available": False,
+                "current_version": settings.APP_VERSION,
+                "latest_version": latest_tag.lstrip("v"),
+                "is_cloud": True,
+            }
+
         # Find .exe asset
         exe_asset = None
         for asset in data.get("assets", []):
@@ -177,6 +187,13 @@ def apply_update(background_tasks: BackgroundTasks):
     """
     Download the latest update from GitHub and restart the application.
     """
+    # Guard against running on cloud/serverless hosts
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not sys.platform.startswith("win"):
+        raise HTTPException(
+            status_code=400,
+            detail="Auto-update is designed for the Windows desktop app (.exe). The cloud web version updates automatically via Git push.",
+        )
+
     info = check_for_updates()
     download_url = info.get("download_url")
 
