@@ -283,11 +283,13 @@ def build_tspl_receipt(
     max_dots = 576 if is_80mm else 384
     page_w_mm = 72 if is_80mm else 58
 
-    # Current date and time
+    # Current date and time in Indian Standard Time (IST = UTC+5:30)
     if created_at:
         date_str = str(created_at)
     else:
-        date_str = datetime.now().strftime("%d-%m-%Y  %I:%M %p")
+        from datetime import timezone, timedelta
+        IST = timezone(timedelta(hours=5, minutes=30))
+        date_str = datetime.now(IST).strftime("%d-%m-%Y  %I:%M %p")
 
     commands = [
         f"SIZE {page_w_mm} mm, 80 mm",  # Placeholder, will update with exact height at end

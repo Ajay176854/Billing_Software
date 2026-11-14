@@ -132,13 +132,18 @@ def direct_print_receipt(
     else:
         raise HTTPException(status_code=404, detail="Sale not found")
 
-    # Format creation date/time if available
+    # Format creation date/time in Indian Standard Time (IST = UTC+5:30)
     created_at_str = None
     if sale and sale.created_at:
         try:
-            created_at_str = sale.created_at.strftime("%d-%m-%Y  %I:%M %p")
+            from datetime import timedelta
+            ist_time = sale.created_at + timedelta(hours=5, minutes=30)
+            created_at_str = ist_time.strftime("%d-%m-%Y  %I:%M %p")
         except Exception:
-            pass
+            try:
+                created_at_str = sale.created_at.strftime("%d-%m-%Y  %I:%M %p")
+            except Exception:
+                pass
 
     try:
         print_receipt_direct(

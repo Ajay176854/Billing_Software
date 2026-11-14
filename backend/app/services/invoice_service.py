@@ -55,7 +55,9 @@ def generate_invoice_html(db: Session, sale_id: int) -> str:
         </tr>
         """
 
-    created = sale.created_at.strftime("%d-%m-%Y %I:%M %p") if sale.created_at else ""
+    from datetime import timedelta
+    ist_time = (sale.created_at + timedelta(hours=5, minutes=30)) if sale.created_at else None
+    created = ist_time.strftime("%d-%m-%Y %I:%M %p") if ist_time else ""
     cashier = sale.user.name if sale.user else ""
 
     html = f"""

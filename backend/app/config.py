@@ -8,20 +8,50 @@ from pydantic_settings import BaseSettings
 
 
 def get_current_app_version() -> str:
-    """Read dynamic version from version.txt if present, or fallback to current release."""
+    """
+    Dynamically resolve the installed version:
+    1. Check version.txt in executable directory
+    2. Check git describe tags if running in repository
+    3. Fallback to latest known release
+    """
+    # 1. Check version.txt next to executable or in bundle
     try:
+        import sys
         if getattr(sys, "frozen", False):
             base_dir = Path(sys.executable).parent
+            # Also check MEIPASS
+            mei_dir = getattr(sys, "_MEIPASS", None)
+            if mei_dir and (Path(mei_dir) / "version.txt").exists():
+                v = (Path(mei_dir) / "version.txt").read_text(encoding="utf-8").strip()
+                if v:
+                    return v.lstrip("v")
         else:
             base_dir = Path(__file__).resolve().parent.parent.parent
+
         v_file = base_dir / "version.txt"
         if v_file.exists():
             v = v_file.read_text(encoding="utf-8").strip()
             if v:
-                return v
+                return v.lstrip("v")
     except Exception:
         pass
-    return "1.0.2"
+
+    # 2. Dynamic Git Tag resolution (Automatic for new releases)
+    try:
+        import subprocess
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        git_tag = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=str(root_dir),
+            text=True,
+            stderr=subprocess.DEVNULL
+        ).strip().lstrip("v")
+        if git_tag:
+            return git_tag
+    except Exception:
+        pass
+
+    return "1.0.3"
 
 
 class Settings(BaseSettings):
