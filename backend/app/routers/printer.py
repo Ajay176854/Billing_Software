@@ -148,13 +148,34 @@ def direct_print_receipt(
     is_doc = is_document_printer(target_printer) or ("A4" in chosen_width) or ("A5" in chosen_width)
     if is_doc:
         doc_format = "A5" if "A5" in chosen_width else "A4"
+        try:
+            print_receipt_direct(
+                invoice_no=invoice_no,
+                items=items_data,
+                subtotal=subtotal,
+                discount=discount,
+                total=total,
+                store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
+                store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
+                store_phone=(payload and payload.store_phone) or store.get("store_phone", "8438353504"),
+                currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
+                paper_width=doc_format,
+                printer_name=target_printer,
+                customer_name=sale.customer_name if sale else None,
+                customer_phone=sale.customer_phone if sale else None,
+                created_at=created_at_str,
+                payment_method=payment_method,
+            )
+        except Exception as e:
+            print(f"Direct spool to {target_printer} note: {e}")
+
         return {
             "status": "ok",
             "printer_type": "document",
             "format": doc_format,
             "target_printer": target_printer,
             "invoice_url": f"/api/billing/invoice/{sale_id}?format={doc_format}",
-            "message": f"Routed to document printer: {target_printer} ({doc_format})",
+            "message": f"Tax Invoice dispatched to {target_printer} ({doc_format})",
         }
 
     # Format creation date/time in Indian Standard Time (IST = UTC+5:30)
@@ -493,6 +514,52 @@ def get_sample_invoice(format: Optional[str] = Query("A4", description="Format: 
     </html>
     """
     return HTMLResponse(content=html)
+
+
+@router.api_route("/test-invoice", methods=["GET", "POST"])
+def direct_test_invoice(format: Optional[str] = "A4", printer_name: Optional[str] = None, db: Session = Depends(get_db)):
+    """Directly print a sample Tax Invoice to Epson EcoTank L6460 or default document printer."""
+    store = get_store_settings(db)
+    target = printer_name or get_default_printer_name() or "L6460 Series(Network)"
+    chosen_fmt = (format or "A4").upper()
+    
+    test_items = [
+        {"name": "22K Gold Plated Choker Necklace", "code": "JW-CH-01", "quantity": 1, "price": 3499.00, "discount": 200.00, "amount": 3299.00},
+        {"name": "Kundan Pearl Drop Earrings (Pair)", "code": "JW-ER-08", "quantity": 2, "price": 1250.00, "discount": 100.00, "amount": 2400.00},
+        {"name": "Diamond Cut Silver Plated Bangle", "code": "JW-BG-14", "quantity": 1, "price": 1899.00, "discount": 50.00, "amount": 1849.00},
+    ]
+    subtotal = 6648.00
+    discount = 350.00
+    total = 6487.00
+    
+    from datetime import datetime, timezone, timedelta
+    IST = timezone(timedelta(hours=5, minutes=30))
+    now_str = datetime.now(IST).strftime("%d-%m-%Y  %I:%M %p")
+
+    try:
+        success = print_receipt_direct(
+            invoice_no="ML-SAMPLE-2026",
+            items=test_items,
+            subtotal=subtotal,
+            discount=discount,
+            total=total,
+            store_name=store.get("store_name", "MOIRA LUXE"),
+            store_address=store.get("store_address", "Main Road, Thuckalay"),
+            store_phone=store.get("store_phone", "8438353504"),
+            currency_symbol=store.get("currency_symbol", "Rs."),
+            paper_width=chosen_fmt,
+            printer_name=target,
+            customer_name="Priyadharshini M",
+            customer_phone="+91 98765 43210",
+            created_at=now_str,
+            payment_method="CASH / UPI",
+        )
+        if success:
+            return {"status": "ok", "message": f"Sample {chosen_fmt} Tax Invoice printed to {target}"}
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to print sample invoice to {target}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
 
 
 @router.api_route("/test-receipt", methods=["GET", "POST"])

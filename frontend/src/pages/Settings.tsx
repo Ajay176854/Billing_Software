@@ -278,14 +278,23 @@ export default function SettingsPage() {
             <div className="pt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const fmt = (form as any).receipt_width || 'A4';
-                  window.open(`/api/printer/sample-invoice?format=${fmt}`, '_blank');
-                  toast.success(`Opening sample ${fmt} invoice for Epson L6460!`);
+                  try {
+                    await api.post(`/printer/test-invoice?format=${fmt}`);
+                    toast.success(`Sent sample ${fmt} invoice to Epson L6460!`);
+                  } catch {
+                    try {
+                      await axios.post(`http://127.0.0.1:8000/api/printer/test-invoice?format=${fmt}`);
+                      toast.success(`Sent sample ${fmt} invoice to Epson L6460!`);
+                    } catch {
+                      window.open(`/api/printer/sample-invoice?format=${fmt}`, '_blank');
+                    }
+                  }
                 }}
                 className="w-full rounded-md border border-emerald-500/40 bg-emerald-500/10 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-1.5"
               >
-                📄 Sample Invoice (L6460)
+                🖨️ Print Sample (L6460)
               </button>
 
               <button

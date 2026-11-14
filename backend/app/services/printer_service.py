@@ -2,6 +2,8 @@
 Printer Service — Direct USB/Hardware RAW printing for TSPL (labels) and ESC/POS (receipts).
 Bypasses the browser print preview dialog and prints directly to the physical printer.
 """
+import sys
+import os
 from datetime import datetime
 from typing import List, Optional
 
@@ -610,6 +612,93 @@ def build_escpos_receipt_native(
     return bytes(data)
 
 
+def print_invoice_document_direct(
+    invoice_no: str,
+    items: list,
+    subtotal: float,
+    discount: float,
+    total: float,
+    store_name: str = "MOIRA LUXE",
+    store_address: str = "Main Road, Thuckalay, Kanyakumari Dist - 629175",
+    store_phone: str = "8438353504",
+    currency_symbol: str = "Rs.",
+    paper_format: str = "A4",
+    printer_name: Optional[str] = None,
+    customer_name: Optional[str] = None,
+    customer_phone: Optional[str] = None,
+    customer_place: Optional[str] = None,
+    created_at: Optional[str] = None,
+    payment_method: Optional[str] = None,
+) -> bool:
+    """
+    Directly sends an A4/A5 Tax Invoice to Epson EcoTank L6460 or any standard Windows printer.
+    Uses native .NET PrintDocument without requiring any browser dialog.
+    """
+    import subprocess
+    import tempfile
+    import json
+    from pathlib import Path
+
+    target_printer = printer_name or get_default_printer_name() or "L6460 Series(Network)"
+    chosen_format = "A5" if "A5" in str(paper_format).upper() else "A4"
+
+    # Find the print script
+    script_path = Path(__file__).resolve().parent.parent.parent.parent / "scripts" / "print_epson_sample.ps1"
+    if getattr(sys, "frozen", False):
+        base_dir = Path(sys.executable).parent
+        candidate = base_dir / "scripts" / "print_epson_sample.ps1"
+        if candidate.exists():
+            script_path = candidate
+        else:
+            mei_dir = getattr(sys, "_MEIPASS", None)
+            if mei_dir and (Path(mei_dir) / "scripts" / "print_epson_sample.ps1").exists():
+                script_path = Path(mei_dir) / "scripts" / "print_epson_sample.ps1"
+
+    invoice_data = {
+        "store_name": store_name,
+        "store_address": store_address,
+        "store_phone": store_phone,
+        "invoice_no": invoice_no,
+        "customer_name": customer_name or "Walk-in Customer",
+        "customer_phone": customer_phone or "-",
+        "customer_place": customer_place or "Thuckalay",
+        "payment_method": payment_method or "CASH",
+        "created_at": created_at,
+        "subtotal": float(subtotal),
+        "discount": float(discount or 0),
+        "tax": float(round(total - (subtotal - discount), 2)) if total > (subtotal - discount) else 0.0,
+        "total": float(total),
+        "items": items,
+    }
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        json.dump(invoice_data, f, ensure_ascii=False)
+        temp_json = f.name
+
+    try:
+        # Run powershell directly to spool the print job
+        cmd = [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", str(script_path),
+            "-PrinterName", target_printer,
+            "-Format", chosen_format,
+            "-JsonPath", temp_json,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        return result.returncode == 0
+    except Exception as e:
+        print(f"Direct document print error: {e}")
+        return False
+    finally:
+        try:
+            import os
+            os.remove(temp_json)
+        except Exception:
+            pass
+
+
 def print_receipt_direct(
     invoice_no: str,
     items: list,
@@ -624,11 +713,36 @@ def print_receipt_direct(
     printer_name: Optional[str] = None,
     created_at: Optional[str] = None,
     payment_method: Optional[str] = None,
+    customer_name: Optional[str] = None,
+    customer_phone: Optional[str] = None,
 ) -> bool:
     """
-    Direct ESC/POS hardware print to the user's DEV 632 / Xprinter thermal receipt printer.
-    Sends standard ESC/POS commands that all receipt printers understand.
+    Direct hardware print:
+    1. If printer is Epson EcoTank L6460 / Inkjet / Laser or A4/A5 is configured:
+       Directly draws and prints professional Tax Invoice via Windows spooler.
+    2. If printer is DEV 632 / Xprinter thermal:
+       Sends native ESC/POS thermal command bytes.
     """
+    target = printer_name or get_default_printer_name()
+    if is_document_printer(target) or "A4" in str(paper_width).upper() or "A5" in str(paper_width).upper():
+        return print_invoice_document_direct(
+            invoice_no=invoice_no,
+            items=items,
+            subtotal=subtotal,
+            discount=discount,
+            total=total,
+            store_name=store_name,
+            store_address=store_address,
+            store_phone=store_phone,
+            currency_symbol=currency_symbol,
+            paper_format=paper_width,
+            printer_name=target,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            created_at=created_at,
+            payment_method=payment_method,
+        )
+
     raw_data = build_escpos_receipt_native(
         invoice_no=invoice_no,
         items=items,
@@ -643,7 +757,6 @@ def print_receipt_direct(
         created_at=created_at,
         payment_method=payment_method,
     )
-    target = printer_name or get_default_printer_name()
     return send_raw_to_printer(raw_data, target)
 
 
