@@ -144,40 +144,6 @@ def direct_print_receipt(
     target_printer = (payload and payload.printer_name) or get_default_printer_name()
     chosen_width = ((payload and payload.paper_width) or store.get("receipt_width", "A4")).upper()
 
-    # Detect if printer is an Epson L6460 / Inkjet / Laser or if A4/A5 is configured
-    is_doc = is_document_printer(target_printer) or ("A4" in chosen_width) or ("A5" in chosen_width)
-    if is_doc:
-        doc_format = "A5" if "A5" in chosen_width else "A4"
-        try:
-            print_receipt_direct(
-                invoice_no=invoice_no,
-                items=items_data,
-                subtotal=subtotal,
-                discount=discount,
-                total=total,
-                store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
-                store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
-                store_phone=(payload and payload.store_phone) or store.get("store_phone", "8438353504"),
-                currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
-                paper_width=doc_format,
-                printer_name=target_printer,
-                customer_name=sale.customer_name if sale else None,
-                customer_phone=sale.customer_phone if sale else None,
-                created_at=created_at_str,
-                payment_method=payment_method,
-            )
-        except Exception as e:
-            print(f"Direct spool to {target_printer} note: {e}")
-
-        return {
-            "status": "ok",
-            "printer_type": "document",
-            "format": doc_format,
-            "target_printer": target_printer,
-            "invoice_url": f"/api/billing/invoice/{sale_id}?format={doc_format}",
-            "message": f"Tax Invoice dispatched to {target_printer} ({doc_format})",
-        }
-
     # Format creation date/time in Indian Standard Time (IST = UTC+5:30)
     created_at_str = None
     if sale and sale.created_at:
@@ -190,6 +156,50 @@ def direct_print_receipt(
                 created_at_str = sale.created_at.strftime("%d-%m-%Y  %I:%M %p")
             except Exception:
                 pass
+    if not created_at_str:
+        from datetime import datetime, timezone, timedelta
+        IST = timezone(timedelta(hours=5, minutes=30))
+        created_at_str = datetime.now(IST).strftime("%d-%m-%Y  %I:%M %p")
+
+    cust_name = (sale and sale.customer_name) or "Walk-in Customer"
+    cust_phone = (sale and sale.customer_phone) or "-"
+    cust_place = (sale and sale.customer_place) or "Thuckalay"
+
+    # Detect if printer is an Epson L6460 / Inkjet / Laser or if A4/A5 is configured
+    is_doc = is_document_printer(target_printer) or ("A4" in chosen_width) or ("A5" in chosen_width)
+    if is_doc:
+        doc_format = "A5" if "A5" in chosen_width else "A4"
+        success = False
+        try:
+            success = print_receipt_direct(
+                invoice_no=invoice_no,
+                items=items_data,
+                subtotal=subtotal,
+                discount=discount,
+                total=total,
+                store_name=(payload and payload.store_name) or store.get("store_name", "MOIRA LUXE"),
+                store_address=(payload and payload.store_address) or store.get("store_address", "Thuckalay"),
+                store_phone=(payload and payload.store_phone) or store.get("store_phone", "8438353504"),
+                currency_symbol=(payload and payload.currency_symbol) or store.get("currency_symbol", "Rs."),
+                paper_width=doc_format,
+                printer_name=target_printer,
+                customer_name=cust_name,
+                customer_phone=cust_phone,
+                created_at=created_at_str,
+                payment_method=payment_method,
+            )
+        except Exception as e:
+            print(f"Direct spool to {target_printer} error: {e}")
+
+        return {
+            "status": "ok" if success else "error",
+            "printed": success,
+            "printer_type": "document",
+            "format": doc_format,
+            "target_printer": target_printer,
+            "invoice_url": f"/api/billing/invoice/{sale_id}?format={doc_format}",
+            "message": f"Tax Invoice dispatched to {target_printer} ({doc_format})",
+        }
 
     try:
         print_receipt_direct(

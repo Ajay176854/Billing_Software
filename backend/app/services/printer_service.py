@@ -654,6 +654,8 @@ def print_invoice_document_direct(
             if mei_dir and (Path(mei_dir) / "scripts" / "print_epson_sample.ps1").exists():
                 script_path = Path(mei_dir) / "scripts" / "print_epson_sample.ps1"
 
+    from app.services.invoice_service import number_to_indian_words
+
     invoice_data = {
         "store_name": store_name,
         "store_address": store_address,
@@ -668,6 +670,7 @@ def print_invoice_document_direct(
         "discount": float(discount or 0),
         "tax": float(round(total - (subtotal - discount), 2)) if total > (subtotal - discount) else 0.0,
         "total": float(total),
+        "words": number_to_indian_words(total),
         "items": items,
     }
 
