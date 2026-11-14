@@ -676,7 +676,11 @@ def print_invoice_document_direct(
         temp_json = f.name
 
     try:
-        # Run powershell directly to spool the print job
+        # Run powershell directly and silently to spool the print job
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
         cmd = [
             "powershell",
             "-NoProfile",
@@ -686,7 +690,9 @@ def print_invoice_document_direct(
             "-Format", chosen_format,
             "-JsonPath", temp_json,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=25, creationflags=flags)
+        if result.returncode != 0:
+            print(f"PowerShell print error: {result.stderr}")
         return result.returncode == 0
     except Exception as e:
         print(f"Direct document print error: {e}")

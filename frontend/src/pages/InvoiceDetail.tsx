@@ -87,11 +87,10 @@ export default function InvoiceDetail() {
     };
 
     try {
-      // 1. Try direct hardware print via current API
+      // 1. Try direct hardware print via current API (Silently spools to Epson or thermal)
       const res = await api.post(`/printer/print-receipt/${id}`, payload);
-      if (res.data?.printer_type === 'document' && res.data?.invoice_url) {
-        triggerIframePrint(res.data.invoice_url);
-        toast.success(`Printing to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})...`);
+      if (res.data?.printer_type === 'document') {
+        toast.success(`Printed Tax Invoice directly to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})!`);
         return;
       }
       toast.success("Printed receipt directly to thermal printer!");
@@ -99,14 +98,13 @@ export default function InvoiceDetail() {
       try {
         // 2. Fallback to explicit localhost:8000
         const res = await axios.post(`http://127.0.0.1:8000/api/printer/print-receipt/${id}`, payload);
-        if (res.data?.printer_type === 'document' && res.data?.invoice_url) {
-          triggerIframePrint(res.data.invoice_url);
-          toast.success(`Printing to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})...`);
+        if (res.data?.printer_type === 'document') {
+          toast.success(`Printed Tax Invoice directly to ${res.data.target_printer || 'Epson L6460'} (${res.data.format})!`);
           return;
         }
         toast.success("Printed receipt directly to thermal printer!");
       } catch {
-        // 3. Fallback: print directly in browser without leaving the page
+        // 3. Fallback: print directly in browser without leaving the page if hardware spool fails
         triggerIframePrint(`/api/billing/invoice/${id}`);
         toast.success("Printing receipt...");
       }
