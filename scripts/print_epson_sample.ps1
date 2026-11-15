@@ -141,7 +141,7 @@ $doc.add_PrintPage({
 
     # Header
     $g.DrawString($storeName, $fontTitle, $brushDark, $left, $top)
-    $badgeText = "TAX INVOICE"
+    $badgeText = if ($raw -and $raw.invoice_title) { $raw.invoice_title } else { "BILL INVOICE" }
     $badgeSize = $g.MeasureString($badgeText, $fontBadge)
     $badgeRect = New-Object System.Drawing.RectangleF(($right - $badgeSize.Width - 20), ($top + 5), ($badgeSize.Width + 20), ($badgeSize.Height + 8))
     $g.FillRectangle((New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(15, 23, 42))), $badgeRect)

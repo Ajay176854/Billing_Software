@@ -670,6 +670,7 @@ def print_invoice_document_direct(
             clean_tax = diff
 
     invoice_data = {
+        "invoice_title": "BILL INVOICE",
         "store_name": store_name,
         "store_address": store_address,
         "store_phone": store_phone,

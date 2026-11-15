@@ -448,7 +448,7 @@ def get_sample_invoice(format: Optional[str] = Query("A4", description="Format: 
                         </div>
                     </td>
                     <td style="text-align:right; vertical-align:top;">
-                        <div class="badge-invoice">TAX INVOICE</div>
+                        <div class="badge-invoice">BILL INVOICE</div>
                         <div style="margin-top:8px;">
                             <svg id="barcode"></svg>
                         </div>

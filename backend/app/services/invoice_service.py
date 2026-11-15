@@ -271,7 +271,7 @@ def generate_invoice_html(db: Session, sale_id: int, paper_format: Optional[str]
                             </div>
                         </td>
                         <td style="text-align:right; vertical-align:top;">
-                            <div class="badge-invoice">TAX INVOICE</div>
+                            <div class="badge-invoice">BILL INVOICE</div>
                             <div style="margin-top:8px;">
                                 <svg id="barcode"></svg>
                             </div>
