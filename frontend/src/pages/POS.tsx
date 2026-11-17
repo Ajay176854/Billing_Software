@@ -4,7 +4,7 @@ import api from '../api/client';
 import toast from 'react-hot-toast';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, ShoppingCart, QrCode, PauseCircle, Clock, RotateCcw, Share2 } from 'lucide-react';
 import { useGlobalScanner } from '../hooks/useGlobalScanner';
-import { openWhatsAppBill } from '../utils/whatsapp';
+import { openWhatsAppBill, dispatchWhatsAppBill } from '../utils/whatsapp';
 
 interface CartItem {
   product_id: number;
@@ -117,7 +117,7 @@ export default function POS() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [printPaper, setPrintPaper] = useState(false);
-  
+
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -405,9 +405,9 @@ export default function POS() {
         directPrintReceipt(res.data.id, receiptPayload);
       }
 
-      // 4. Instant WhatsApp invoice delivery
+      // 4. Instant WhatsApp invoice delivery (Autonomous or fallback)
       if (sendWhatsApp && savedCustomerPhone) {
-        openWhatsAppBill({
+        dispatchWhatsAppBill({
           customerName: savedCustomerName,
           customerPhone: savedCustomerPhone,
           invoiceNo: res.data.invoice_no,
@@ -706,9 +706,9 @@ export default function POS() {
                   let expBadge = null;
                   if (p.expiry_date) {
                     const today = new Date();
-                    today.setHours(0,0,0,0);
+                    today.setHours(0, 0, 0, 0);
                     const exp = new Date(p.expiry_date);
-                    exp.setHours(0,0,0,0);
+                    exp.setHours(0, 0, 0, 0);
                     const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     if (diffDays < 0) {
                       expBadge = <span className="rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">Expired</span>;
@@ -774,11 +774,10 @@ export default function POS() {
           {/* 3. Held Bills Button */}
           <button
             onClick={() => setShowHeldListModal(true)}
-            className={`flex items-center gap-2 rounded-xl border h-12 px-4 text-sm font-semibold transition-all shadow-sm ${
-              heldBills.length > 0
+            className={`flex items-center gap-2 rounded-xl border h-12 px-4 text-sm font-semibold transition-all shadow-sm ${heldBills.length > 0
                 ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
                 : 'border-border bg-bg-card text-text-secondary hover:border-accent hover:text-accent'
-            }`}
+              }`}
             title="View Held Bills (F9)"
           >
             <Clock className="h-4 w-4" />
@@ -977,8 +976,8 @@ export default function POS() {
               {showSuggestions && customerSuggestions.length > 0 && (
                 <div className="absolute left-4 right-4 top-[calc(100%-10px)] z-50 max-h-48 overflow-y-auto rounded-lg border border-border bg-bg-card shadow-xl">
                   {customerSuggestions.map((c, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="cursor-pointer border-b border-border/50 p-3 hover:bg-bg-hover last:border-0"
                       onMouseDown={(e) => {
                         e.preventDefault(); // Prevent focus loss on input
@@ -1032,11 +1031,11 @@ export default function POS() {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-text-secondary">Cash Received</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0"
-                      value={cashReceived} 
-                      onChange={(e) => setCashReceived(e.target.value)} 
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value)}
                       placeholder="0.00"
                       className="w-full rounded-lg border border-border bg-bg-card px-4 py-3 text-lg font-semibold text-text-primary outline-none focus:border-accent"
                       autoFocus

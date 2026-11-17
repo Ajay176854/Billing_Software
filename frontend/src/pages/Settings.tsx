@@ -4,6 +4,7 @@ import api from '../api/client';
 import toast from 'react-hot-toast';
 import { Save, Database, Download, Edit2, Check, X, Trash2, Lock } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import WhatsAppSettings from '../components/WhatsAppSettings';
 
 export default function SettingsPage() {
   const [form, setForm] = useState({ store_name: '', store_address: '', store_phone: '', store_email: '', store_gst: '', invoice_prefix: 'INV', currency_symbol: '' });
@@ -345,6 +346,9 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* WhatsApp Autonomous Engine & QR Linking */}
+      <WhatsAppSettings />
 
       {/* Export Store Data */}
       <div className="rounded-xl border border-border bg-bg-card p-6">

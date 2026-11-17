@@ -17,6 +17,14 @@ from tkinter import filedialog
 from app.main import app
 
 class DesktopApi:
+    def open_external(self, url):
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            return True
+        except Exception:
+            return False
+
     def save_excel(self, base64_data, filename):
         is_csv = filename.lower().endswith(".csv")
         ext = ".csv" if is_csv else ".xlsx"

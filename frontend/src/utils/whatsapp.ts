@@ -101,6 +101,9 @@ export function buildWhatsAppBillText(data: WhatsAppBillData): string {
   return lines.join('\n');
 }
 
+import api from '../api/client';
+import toast from 'react-hot-toast';
+
 export function openWhatsAppBill(data: WhatsAppBillData): boolean {
   const cleanPhone = formatWhatsAppPhone(data.customerPhone);
   if (!cleanPhone) {
@@ -112,6 +115,41 @@ export function openWhatsAppBill(data: WhatsAppBillData): boolean {
 
   // Direct wa.me link seamlessly opens WhatsApp Desktop or WhatsApp Web
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
-  window.open(waUrl, '_blank', 'noopener,noreferrer');
+  
+  if ((window as any).pywebview?.api?.open_external) {
+    (window as any).pywebview.api.open_external(waUrl);
+  } else {
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  }
   return true;
+}
+
+/**
+ * Autonomous delivery first via linked Baileys engine,
+ * falling back to wa.me if unlinked.
+ */
+export async function dispatchWhatsAppBill(data: WhatsAppBillData): Promise<boolean> {
+  const cleanPhone = formatWhatsAppPhone(data.customerPhone);
+  if (!cleanPhone) {
+    return false;
+  }
+
+  const message = buildWhatsAppBillText(data);
+
+  // 1. Try autonomous direct delivery via local Baileys engine
+  try {
+    const res = await api.post('/whatsapp/send', {
+      phone: cleanPhone,
+      message: message,
+    });
+    if (res.data?.success) {
+      toast.success(`📱 WhatsApp Bill delivered autonomously to +${cleanPhone}!`);
+      return true;
+    }
+  } catch (err) {
+    // If Baileys not connected yet or offline, proceed to fallback
+  }
+
+  // 2. Seamless fallback: open wa.me
+  return openWhatsAppBill(data);
 }
