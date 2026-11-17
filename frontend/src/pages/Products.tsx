@@ -25,6 +25,7 @@ export default function Products() {
   const [printProduct, setPrintProduct] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
+  const [hasExpiry, setHasExpiry] = useState(false);
   const [form, setForm] = useState({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs', expiry_date: '' });
   const [loading, setLoading] = useState(true);
 
@@ -76,12 +77,14 @@ export default function Products() {
 
   const openAdd = () => {
     setEditing(null);
+    setHasExpiry(false);
     setForm({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs', expiry_date: '' });
     setShowModal(true);
   };
 
   const openEdit = (p: Product) => {
     setEditing(p);
+    setHasExpiry(Boolean(p.expiry_date));
     setForm({
       barcode: p.barcode || '', sku: p.sku || '', name: p.name,
       category_id: p.category_id ? String(p.category_id) : '',
@@ -118,7 +121,7 @@ export default function Products() {
       stock_qty: Number(form.stock_qty),
       reorder_level: Number(form.reorder_level),
       unit: form.unit,
-      expiry_date: form.expiry_date || null,
+      expiry_date: hasExpiry && form.expiry_date ? form.expiry_date : null,
     };
     try {
       if (editing) {
@@ -298,9 +301,41 @@ export default function Products() {
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Tax Rate (%)</label><input type="number" step="0.1" min="0" max="100" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">{editing ? 'Current Stock' : 'Initial Stock'}</label><input type="number" min="0" value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Reorder Level</label><input type="number" min="0" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
-              <div className="col-span-2">
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Expiry Date (Cosmetics/Perishables)</label>
-                <input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" />
+              
+              {/* Expiry Date Enable / Disable Option */}
+              <div className="col-span-2 rounded-xl border border-border bg-bg-secondary/40 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-text-primary">Does this product have an Expiry Date?</p>
+                    <p className="text-[11px] text-text-muted">Enable for cosmetics, creams, medicines, or perishables</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasExpiry}
+                      onChange={(e) => {
+                        setHasExpiry(e.target.checked);
+                        if (!e.target.checked) setForm({ ...form, expiry_date: '' });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                    <span className="ml-2.5 text-xs font-semibold text-text-primary">{hasExpiry ? 'Enabled' : 'Disabled'}</span>
+                  </label>
+                </div>
+
+                {hasExpiry && (
+                  <div className="pt-2 border-t border-border/50 animate-fade-in">
+                    <label className="mb-1 block text-xs font-medium text-text-secondary">Select Expiry Date *</label>
+                    <input
+                      type="date"
+                      required={hasExpiry}
+                      value={form.expiry_date}
+                      onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
+                      className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-6 flex gap-3 justify-end">

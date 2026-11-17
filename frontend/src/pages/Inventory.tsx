@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
-import { Warehouse, AlertTriangle, XCircle, ArrowDownUp, RefreshCw } from 'lucide-react';
+import { Warehouse, AlertTriangle, XCircle, ArrowDownUp, RefreshCw, Clock } from 'lucide-react';
 import Pagination from '../components/Pagination';
 
 export default function Inventory() {
-  const [tab, setTab] = useState<'all' | 'low' | 'out' | 'history'>('all');
+  const [tab, setTab] = useState<'all' | 'low' | 'out' | 'expiring' | 'history'>('all');
   const [products, setProducts] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function Inventory() {
     try {
       if (tab === 'low') { const res = await api.get('/inventory/low-stock'); setProducts(res.data); }
       else if (tab === 'out') { const res = await api.get('/inventory/out-of-stock'); setProducts(res.data); }
+      else if (tab === 'expiring') { const res = await api.get('/inventory/expiring'); setProducts(res.data); }
       else if (tab === 'history') { const res = await api.get('/inventory/transactions?limit=500'); setTransactions(res.data); }
       else { const res = await api.get('/products'); setProducts(res.data); }
     } catch {}
@@ -37,6 +38,7 @@ export default function Inventory() {
     { key: 'all', label: 'All Products', icon: Warehouse },
     { key: 'low', label: 'Low Stock', icon: AlertTriangle },
     { key: 'out', label: 'Out of Stock', icon: XCircle },
+    { key: 'expiring', label: 'Expiring Soon', icon: Clock },
     { key: 'history', label: 'Stock History', icon: ArrowDownUp },
   ];
 
@@ -123,22 +125,46 @@ export default function Inventory() {
                 <th className="px-4 py-3 text-left font-medium">Barcode</th>
                 <th className="px-4 py-3 text-left font-medium">Category</th>
                 <th className="px-4 py-3 text-right font-medium">Stock</th>
+                <th className="px-4 py-3 text-center font-medium">Expiry</th>
                 <th className="px-4 py-3 text-right font-medium">Reorder</th>
                 <th className="px-4 py-3 text-right font-medium">Value</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedData.map((p: any) => (
-                <tr key={p.id} className="border-b border-border/30 hover:bg-bg-hover/50">
-                  <td className="px-4 py-3 font-medium text-text-primary">{p.name}</td>
-                  <td className="px-4 py-3 text-text-muted font-mono text-xs">{p.barcode || '-'}</td>
-                  <td className="px-4 py-3 text-text-muted">{p.category_name || '-'}</td>
-                  <td className={`px-4 py-3 text-right font-bold ${p.stock_qty === 0 ? 'text-danger' : p.stock_qty <= p.reorder_level ? 'text-warning' : 'text-success'}`}>{p.stock_qty}</td>
-                  <td className="px-4 py-3 text-right text-text-muted">{p.reorder_level}</td>
-                  <td className="px-4 py-3 text-right text-text-primary">{fmt(p.stock_qty * p.purchase_price)}</td>
-                </tr>
-              ))}
-              {paginatedData.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-text-muted">No products found</td></tr>}
+              {paginatedData.map((p: any) => {
+                let expBadge = null;
+                if (p.expiry_date) {
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const exp = new Date(p.expiry_date);
+                  exp.setHours(0,0,0,0);
+                  const diff = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  if (diff < 0) {
+                    expBadge = <span className="rounded bg-danger/15 px-2 py-0.5 text-xs font-bold text-danger">Expired</span>;
+                  } else if (diff <= 30) {
+                    expBadge = <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-600">Exp in {diff}d</span>;
+                  } else {
+                    expBadge = <span className="rounded bg-success/15 px-2 py-0.5 text-xs font-medium text-success">{p.expiry_date}</span>;
+                  }
+                }
+                return (
+                  <tr key={p.id} className="border-b border-border/30 hover:bg-bg-hover/50">
+                    <td className="px-4 py-3 font-medium text-text-primary">
+                      <div className="flex items-center gap-1.5">
+                        <span>{p.name}</span>
+                        {p.expiry_date && <span className="text-xs" title={`Expiry: ${p.expiry_date}`}>⏰</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-text-muted font-mono text-xs">{p.barcode || '-'}</td>
+                    <td className="px-4 py-3 text-text-muted">{p.category_name || '-'}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${p.stock_qty === 0 ? 'text-danger' : p.stock_qty <= p.reorder_level ? 'text-warning' : 'text-success'}`}>{p.stock_qty}</td>
+                    <td className="px-4 py-3 text-center">{expBadge || <span className="text-text-muted text-xs">-</span>}</td>
+                    <td className="px-4 py-3 text-right text-text-muted">{p.reorder_level}</td>
+                    <td className="px-4 py-3 text-right text-text-primary">{fmt(p.stock_qty * p.purchase_price)}</td>
+                  </tr>
+                );
+              })}
+              {paginatedData.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-text-muted">No products found</td></tr>}
             </tbody>
           </table>
           <Pagination 

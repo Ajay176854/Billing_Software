@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import { IndianRupee, Receipt, AlertTriangle, TrendingUp, CreditCard, X } from 'lucide-react';
+import { IndianRupee, Receipt, AlertTriangle, TrendingUp, CreditCard, X, Clock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardData {
@@ -137,7 +137,7 @@ export default function Dashboard() {
       )}
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard 
           icon={IndianRupee} 
           label="Today's Sales" 
@@ -219,10 +219,44 @@ export default function Dashboard() {
           })}
         />
         <StatCard 
+          icon={Clock} 
+          label="Expiry Alerts" 
+          value={data.expired_count ? `${data.expired_count} Expired` : `${data.expiring_soon_count || 0} Expiring`} 
+          gradient={data.expired_count ? "bg-gradient-to-br from-rose-500 to-red-500" : (data.expiring_soon_count || 0) > 0 ? "bg-gradient-to-br from-amber-500 to-orange-400" : "bg-gradient-to-br from-teal-500 to-emerald-400"} 
+          subtitle={`${data.expired_count || 0} expired • ${data.expiring_soon_count || 0} near`}
+          onClick={() => setModalContent({
+            title: "Cosmetic & Perishable Expiry Status",
+            desc: (
+              <div className="space-y-3">
+                <p><b>{data.expired_count || 0}</b> expired products, <b>{data.expiring_soon_count || 0}</b> products expiring within 30 days.</p>
+                {(data.expiring_products || []).length > 0 ? (
+                  <div className="rounded-lg border border-border bg-bg-secondary p-3 space-y-2 max-h-60 overflow-y-auto">
+                    {(data.expiring_products || []).map((p: any) => (
+                      <div key={p.id} className="flex justify-between items-center text-sm border-b border-border/50 pb-1.5 last:border-0 last:pb-0">
+                        <div>
+                          <span className="font-medium text-text-primary block">{p.name}</span>
+                          <span className="text-xs text-text-muted font-mono">{p.barcode || 'No barcode'} &bull; Stock: {p.stock_qty}</span>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${p.is_expired ? 'bg-danger/20 text-danger' : 'bg-amber-500/20 text-amber-600'}`}>
+                          {p.is_expired ? 'Expired' : `${p.days_left}d left (${p.expiry_date})`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-muted">No cosmetic/perishable products are currently near expiry.</p>
+                )}
+              </div>
+            ),
+            path: "/inventory",
+            btnText: "Check Expiring Inventory"
+          })}
+        />
+        <StatCard 
           icon={TrendingUp} 
           label="Inventory Value" 
           value={fmt(data.total_retail_inventory_value || data.total_inventory_value)} 
-          subtitle={`Buy Cost: ${fmt(data.total_inventory_value)} | Profit: ${fmt(data.potential_inventory_profit || 0)}`}
+          subtitle={`Buy: ${fmt(data.total_inventory_value)} | Profit: ${fmt(data.potential_inventory_profit || 0)}`}
           gradient="bg-gradient-to-br from-blue-500 to-blue-400" 
           onClick={() => setModalContent({
             title: "Inventory Valuation Details",

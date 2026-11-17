@@ -62,6 +62,26 @@ def out_of_stock_products(db: Session = Depends(get_db), current_user=Depends(ge
     return [_product_to_response(p) for p in products]
 
 
+@router.get("/expiring", response_model=List[ProductResponse])
+def expiring_inventory(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get all products that have an expiry date, ordered by expiry date ascending."""
+    from sqlalchemy.orm import joinedload
+    products = (
+        db.query(Product)
+        .options(joinedload(Product.category))
+        .filter(
+            Product.status == "active",
+            Product.expiry_date != None,
+        )
+        .order_by(Product.expiry_date.asc())
+        .all()
+    )
+    return [_product_to_response(p) for p in products]
+
+
 @router.get("/transactions", response_model=List[StockTransactionResponse])
 def stock_transactions(
     product_id: Optional[int] = None,

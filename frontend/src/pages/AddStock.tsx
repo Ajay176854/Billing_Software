@@ -14,6 +14,7 @@ export default function AddStock() {
   const [activeTab, setActiveTab] = useState<'new' | 'existing'>('new');
   const [categories, setCategories] = useState<any[]>([]);
   const [printProduct, setPrintProduct] = useState<any>(null);
+  const [hasExpiry, setHasExpiry] = useState(false);
 
   // New state for inline product creation
   const [newProductForm, setNewProductForm] = useState({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '', expiry_date: '' });
@@ -98,13 +99,14 @@ export default function AddStock() {
         selling_price: Number(newProductForm.selling_price),
         stock_qty: Number(quantity) || 0,
         tax_rate: Number(newProductForm.tax_rate) || 0,
-        expiry_date: newProductForm.expiry_date || null,
+        expiry_date: hasExpiry && newProductForm.expiry_date ? newProductForm.expiry_date : null,
         reorder_level: 10,   // Default values
         unit: 'pcs'          // Default values
       });
       toast.success('New product added to database and stock updated!');
       setPrintProduct(res.data); // Prompt to print label
       setNewProductForm({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '', expiry_date: '' });
+      setHasExpiry(false);
       setQuantity('');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to create product');
@@ -204,17 +206,47 @@ export default function AddStock() {
             </div>
           </div>
 
-          <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-text-primary mb-3">Initial Stock & Expiry (Optional)</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Quantity to Add</label>
-                <input type="number" min="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary" placeholder="Enter quantity" />
+          <div className="border-t border-border pt-4 space-y-4">
+            <h4 className="text-sm font-semibold text-text-primary">Initial Stock (Optional)</h4>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Quantity to Add</label>
+              <input type="number" min="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary" placeholder="Enter quantity" />
+            </div>
+
+            {/* Expiry Date Enable / Disable Option */}
+            <div className="rounded-xl border border-border bg-bg-secondary/40 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">Does this product have an Expiry Date?</p>
+                  <p className="text-[11px] text-text-muted">Enable only for cosmetics, creams, medicines, or perishables</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasExpiry}
+                    onChange={(e) => {
+                      setHasExpiry(e.target.checked);
+                      if (!e.target.checked) setNewProductForm({ ...newProductForm, expiry_date: '' });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  <span className="ml-2.5 text-xs font-semibold text-text-primary">{hasExpiry ? 'Enabled' : 'Disabled'}</span>
+                </label>
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Expiry Date (Cosmetics/Perishables)</label>
-                <input type="date" value={newProductForm.expiry_date} onChange={(e) => setNewProductForm({ ...newProductForm, expiry_date: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary" />
-              </div>
+
+              {hasExpiry && (
+                <div className="pt-2 border-t border-border/50 animate-fade-in">
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Select Expiry Date *</label>
+                  <input
+                    type="date"
+                    required={hasExpiry}
+                    value={newProductForm.expiry_date}
+                    onChange={(e) => setNewProductForm({ ...newProductForm, expiry_date: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
