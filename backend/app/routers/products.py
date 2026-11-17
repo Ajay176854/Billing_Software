@@ -31,6 +31,7 @@ def _product_to_response(product: Product) -> ProductResponse:
         stock_qty=product.stock_qty,
         reorder_level=product.reorder_level,
         unit=product.unit,
+        expiry_date=product.expiry_date,
         status=product.status,
         created_at=product.created_at,
         updated_at=product.updated_at,
@@ -75,6 +76,43 @@ def list_products(
     result = [_product_to_response(p) for p in products]
     cache.set(cache_key, result, ttl=5)  # 5s micro-cache so stock is always fresh and responsive
     return result
+
+
+@router.get("/expiring-soon")
+def get_expiring_products(
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Get products that are expired or expiring within `days` days."""
+    from datetime import date, timedelta
+    today = date.today()
+    threshold = today + timedelta(days=days)
+
+    products = (
+        db.query(Product)
+        .filter(
+            Product.status == "active",
+            Product.expiry_date != None,
+            Product.expiry_date <= threshold
+        )
+        .order_by(Product.expiry_date.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "barcode": p.barcode or p.sku,
+            "stock_qty": p.stock_qty,
+            "selling_price": p.selling_price,
+            "expiry_date": p.expiry_date.isoformat() if p.expiry_date else None,
+            "days_left": (p.expiry_date - today).days if p.expiry_date else None,
+            "is_expired": p.expiry_date < today if p.expiry_date else False,
+        }
+        for p in products
+    ]
 
 
 @router.get("/next-code")

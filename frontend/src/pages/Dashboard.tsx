@@ -10,6 +10,9 @@ interface DashboardData {
   total_products: number;
   low_stock_count: number;
   out_of_stock_count: number;
+  expired_count?: number;
+  expiring_soon_count?: number;
+  expiring_products?: any[];
   total_inventory_value: number;
   total_retail_inventory_value?: number;
   potential_inventory_profit?: number;
@@ -85,6 +88,53 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
         <p className="text-sm text-text-muted">Today's overview and business insights</p>
       </div>
+
+      {/* Expiry Alert Banner */}
+      {((data.expiring_soon_count || 0) > 0 || (data.expired_count || 0) > 0) && (
+        <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 transition-all hover:bg-amber-500/15">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-text-primary">
+                Expiry Alerts: {data.expired_count ? `${data.expired_count} Expired` : ''} {data.expired_count && data.expiring_soon_count ? ' • ' : ''} {data.expiring_soon_count ? `${data.expiring_soon_count} Expiring Soon (30 days)` : ''}
+              </p>
+              <p className="text-xs text-text-muted">Action needed for cosmetics and perishable stock</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setModalContent({
+              title: "Product Expiry Alerts",
+              desc: (
+                <div className="space-y-3">
+                  <p>Products nearing or past expiry date:</p>
+                  {(data.expiring_products || []).length > 0 && (
+                    <div className="rounded-lg border border-border bg-bg-secondary p-3 space-y-2 max-h-60 overflow-y-auto">
+                      {(data.expiring_products || []).map((p: any) => (
+                        <div key={p.id} className="flex justify-between items-center text-sm border-b border-border/50 pb-1.5 last:border-0 last:pb-0">
+                          <div>
+                            <span className="font-medium text-text-primary block">{p.name}</span>
+                            <span className="text-xs text-text-muted font-mono">{p.barcode || 'No barcode'} &bull; Stock: {p.stock_qty}</span>
+                          </div>
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.is_expired ? 'bg-danger/20 text-danger' : 'bg-amber-500/20 text-amber-600'}`}>
+                            {p.is_expired ? 'Expired' : `${p.days_left}d left (${p.expiry_date})`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ),
+              path: "/products",
+              btnText: "Manage Products"
+            })}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700 transition-colors"
+          >
+            View Items
+          </button>
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

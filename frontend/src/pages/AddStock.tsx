@@ -16,7 +16,7 @@ export default function AddStock() {
   const [printProduct, setPrintProduct] = useState<any>(null);
 
   // New state for inline product creation
-  const [newProductForm, setNewProductForm] = useState({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '' });
+  const [newProductForm, setNewProductForm] = useState({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '', expiry_date: '' });
 
   // New state for inline category creation
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -98,12 +98,13 @@ export default function AddStock() {
         selling_price: Number(newProductForm.selling_price),
         stock_qty: Number(quantity) || 0,
         tax_rate: Number(newProductForm.tax_rate) || 0,
+        expiry_date: newProductForm.expiry_date || null,
         reorder_level: 10,   // Default values
         unit: 'pcs'          // Default values
       });
       toast.success('New product added to database and stock updated!');
       setPrintProduct(res.data); // Prompt to print label
-      setNewProductForm({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '' });
+      setNewProductForm({ name: '', barcode: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '', expiry_date: '' });
       setQuantity('');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to create product');
@@ -204,11 +205,15 @@ export default function AddStock() {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-text-primary mb-3">Initial Stock (Optional)</h4>
+            <h4 className="text-sm font-semibold text-text-primary mb-3">Initial Stock & Expiry (Optional)</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-text-secondary">Quantity to Add</label>
                 <input type="number" min="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary" placeholder="Enter quantity" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Expiry Date (Cosmetics/Perishables)</label>
+                <input type="date" value={newProductForm.expiry_date} onChange={(e) => setNewProductForm({ ...newProductForm, expiry_date: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text-primary" />
               </div>
             </div>
           </div>

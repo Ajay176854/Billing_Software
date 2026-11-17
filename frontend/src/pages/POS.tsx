@@ -230,7 +230,7 @@ export default function POS() {
         (p.name && p.name.toLowerCase().includes(cleanQ)) ||
         (p.barcode && p.barcode.toLowerCase().includes(cleanQ)) ||
         (p.sku && p.sku.toLowerCase().includes(cleanQ))
-      ).slice(0, 20);
+      );
       setSearchResults(filtered);
       return;
     }
@@ -670,31 +670,112 @@ export default function POS() {
     <div className="flex h-[calc(100vh-48px)] gap-4">
       {/* Left — Product Area */}
       <div className="flex flex-1 flex-col">
-        {/* Barcode + Search + Held Bills */}
-        <div className="mb-4 flex gap-3">
+        {/* Top Action Bar: Search (FIRST) + Barcode Scan (OTHER SIDE) + Held Bills */}
+        <div className="mb-4 flex gap-3 items-center">
+          {/* 1. Search Bar (FIRST) */}
           <div className="relative flex-1">
-            <input
-              ref={barcodeRef}
-              id="pos-barcode"
-              type="text"
-              value={barcodeInput}
-              onChange={(e) => setBarcodeInput(e.target.value)}
-              onKeyDown={handleBarcodeScan}
-              className="w-full rounded-lg border border-border bg-bg-input px-4 py-3 pl-10 text-sm text-text-primary placeholder-text-muted"
-              placeholder="Scan barcode or type & press Enter..."
-              autoFocus
-            />
-            <ShoppingCart className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+            <div className="relative flex items-center">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-500 pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => { if (searchQuery.trim().length >= 2) handleSearch(searchQuery); }}
+                className="w-full h-12 rounded-xl border-2 border-indigo-500/30 bg-bg-card pl-11 pr-9 text-sm font-medium text-text-primary placeholder-text-muted transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                placeholder="Search products by name or code..."
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-text-muted hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Live Search Results Dropdown - Shows ALL results */}
+            {searchQuery.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-96 overflow-y-auto rounded-xl border border-border bg-bg-card shadow-2xl divide-y divide-border/40">
+                <div className="bg-bg-secondary/80 px-4 py-2 text-xs font-semibold text-text-muted flex justify-between items-center sticky top-0 backdrop-blur-sm z-10">
+                  <span>Found {searchResults.length} matching product(s)</span>
+                  <span className="text-[11px] font-normal">Click item to add to bill</span>
+                </div>
+                {searchResults.map((p) => {
+                  let expBadge = null;
+                  if (p.expiry_date) {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const exp = new Date(p.expiry_date);
+                    exp.setHours(0,0,0,0);
+                    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                      expBadge = <span className="rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">Expired</span>;
+                    } else if (diffDays <= 30) {
+                      expBadge = <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">Exp: {diffDays}d</span>;
+                    }
+                  }
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        addToCart(p);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                        barcodeRef.current?.focus();
+                      }}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-indigo-50/10 hover:border-l-4 hover:border-indigo-500"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+                          {expBadge}
+                        </div>
+                        <p className="text-xs text-text-muted font-mono">{p.barcode || p.sku || 'No code'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{fmt(p.selling_price)}</p>
+                        <p className={`text-xs ${p.stock_qty > 0 ? 'text-success font-medium' : 'text-danger font-medium'}`}>
+                          {p.stock_qty > 0 ? `${p.stock_qty} in stock` : 'Out of stock'}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+                {searchResults.length === 0 && (
+                  <p className="px-4 py-4 text-center text-sm text-text-muted">No products found for "{searchQuery}"</p>
+                )}
+              </div>
+            )}
           </div>
-          <button
-            onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100); }}
-            className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-4 py-3 text-sm font-medium text-text-secondary transition-all hover:border-accent hover:text-accent"
-          >
-            <Search className="h-4 w-4" /> Search
-          </button>
+
+          {/* 2. Barcode Scan Bar (OTHER SIDE) */}
+          <div className="relative flex-1">
+            <div className="relative flex items-center">
+              <QrCode className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-500 pointer-events-none" />
+              <input
+                ref={barcodeRef}
+                id="pos-barcode"
+                type="text"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={handleBarcodeScan}
+                className="w-full h-12 rounded-xl border-2 border-emerald-500/30 bg-bg-card pl-11 pr-20 text-sm font-medium text-text-primary placeholder-text-muted transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
+                placeholder="Scan barcode or type & press Enter..."
+                autoFocus
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 pointer-events-none">
+                Enter ↵
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Held Bills Button */}
           <button
             onClick={() => setShowHeldListModal(true)}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 rounded-xl border h-12 px-4 text-sm font-semibold transition-all shadow-sm ${
               heldBills.length > 0
                 ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
                 : 'border-border bg-bg-card text-text-secondary hover:border-accent hover:text-accent'
@@ -710,43 +791,6 @@ export default function POS() {
             )}
           </button>
         </div>
-
-        {/* Search Dropdown */}
-        {showSearch && (
-          <div className="animate-scale-in relative z-20 mb-4 rounded-xl border border-border bg-bg-card shadow-modal">
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-t-xl border-b border-border bg-transparent px-4 py-3 text-sm text-text-primary placeholder-text-muted"
-              placeholder="Search products by name or barcode..."
-            />
-            <div className="max-h-60 overflow-y-auto">
-              {searchResults.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addToCart(p)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-bg-hover"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{p.name}</p>
-                    <p className="text-xs text-text-muted">{p.barcode || p.sku || 'No barcode'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-accent">{fmt(p.selling_price)}</p>
-                    <p className={`text-xs ${p.stock_qty > 0 ? 'text-success' : 'text-danger'}`}>
-                      {p.stock_qty > 0 ? `${p.stock_qty} in stock` : 'Out of stock'}
-                    </p>
-                  </div>
-                </button>
-              ))}
-              {searchQuery.length >= 2 && searchResults.length === 0 && (
-                <p className="px-4 py-3 text-sm text-text-muted">No products found</p>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Cart Table */}
         <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-bg-card">

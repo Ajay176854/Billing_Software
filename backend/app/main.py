@@ -41,6 +41,15 @@ async def lifespan(app: FastAPI):
             try:
                 from app.database import engine, Base
                 Base.metadata.create_all(bind=engine)
+                # Auto-migrate any new columns
+                try:
+                    from sqlalchemy import text
+                    with engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date DATE;"))
+                        conn.commit()
+                except Exception as mig_err:
+                    print(f"Column migration check: {mig_err}")
+
                 db = SessionLocal()
                 try:
                     seed_database(db)

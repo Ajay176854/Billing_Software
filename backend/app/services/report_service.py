@@ -118,12 +118,40 @@ def get_dashboard_stats(db: Session) -> dict:
         for p in low_stock_products_query
     ]
 
+    # Expiry stats and expiring soon items (next 30 days or already expired)
+    from datetime import date
+    today_date = date.today()
+    expiry_threshold = today_date + timedelta(days=30)
+    expiring_query = db.query(Product).filter(
+        Product.status == "active",
+        Product.expiry_date != None,
+        Product.expiry_date <= expiry_threshold
+    ).order_by(Product.expiry_date.asc()).all()
+
+    expired_count = sum(1 for p in expiring_query if p.expiry_date < today_date)
+    expiring_soon_count = len(expiring_query) - expired_count
+    expiring_products_list = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "barcode": p.barcode or p.sku,
+            "stock_qty": p.stock_qty,
+            "expiry_date": p.expiry_date.isoformat(),
+            "days_left": (p.expiry_date - today_date).days,
+            "is_expired": p.expiry_date < today_date,
+        }
+        for p in expiring_query[:8]
+    ]
+
     return {
         "today_sales": today_sales,
         "today_bills": today_bills,
         "total_products": total_products,
         "low_stock_count": low_stock_count,
         "out_of_stock_count": out_of_stock_count,
+        "expired_count": expired_count,
+        "expiring_soon_count": expiring_soon_count,
+        "expiring_products": expiring_products_list,
         "total_inventory_value": float(inventory_value),
         "total_retail_inventory_value": float(retail_value),
         "potential_inventory_profit": float(retail_value) - float(inventory_value),

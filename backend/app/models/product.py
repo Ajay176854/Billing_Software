@@ -2,7 +2,7 @@
 Product model — TRD §9 products table.
 """
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -21,6 +21,7 @@ class Product(Base):
     stock_qty = Column(Integer, nullable=False, default=0)
     reorder_level = Column(Integer, nullable=False, default=10)
     unit = Column(String(20), nullable=False, default="pcs")
+    expiry_date = Column(Date, nullable=True, index=True)
     status = Column(String(20), nullable=False, default="active")  # active, inactive
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

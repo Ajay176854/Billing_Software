@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
-import { Plus, Search, Edit2, X, Package, Printer, Trash2, Tag } from 'lucide-react';
+import { Plus, Search, Edit2, X, Package, Printer, Trash2, Tag, Calendar, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductLabelModal from '../components/ProductLabelModal';
 import Pagination from '../components/Pagination';
@@ -10,7 +10,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 interface Product {
   id: number; barcode: string | null; sku: string | null; name: string; category_id: number | null;
   category_name: string | null; purchase_price: number; selling_price: number; tax_rate: number;
-  stock_qty: number; reorder_level: number; unit: string; status: string;
+  stock_qty: number; reorder_level: number; unit: string; expiry_date: string | null; status: string;
 }
 
 interface Category { id: number; name: string; }
@@ -25,7 +25,7 @@ export default function Products() {
   const [printProduct, setPrintProduct] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
-  const [form, setForm] = useState({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs' });
+  const [form, setForm] = useState({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs', expiry_date: '' });
   const [loading, setLoading] = useState(true);
 
   // Category modal state
@@ -76,7 +76,7 @@ export default function Products() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs' });
+    setForm({ barcode: '', sku: '', name: '', category_id: '', purchase_price: '', selling_price: '', tax_rate: '18', stock_qty: '0', reorder_level: '10', unit: 'pcs', expiry_date: '' });
     setShowModal(true);
   };
 
@@ -88,6 +88,7 @@ export default function Products() {
       purchase_price: String(p.purchase_price), selling_price: String(p.selling_price),
       tax_rate: String(p.tax_rate), stock_qty: String(p.stock_qty),
       reorder_level: String(p.reorder_level), unit: p.unit,
+      expiry_date: p.expiry_date || '',
     });
     setShowModal(true);
   };
@@ -117,6 +118,7 @@ export default function Products() {
       stock_qty: Number(form.stock_qty),
       reorder_level: Number(form.reorder_level),
       unit: form.unit,
+      expiry_date: form.expiry_date || null,
     };
     try {
       if (editing) {
@@ -152,6 +154,35 @@ export default function Products() {
     if (p.stock_qty === 0) return <span className="inline-block rounded-full bg-danger/15 px-2 py-0.5 text-xs font-medium text-danger">Out of Stock</span>;
     if (p.stock_qty <= p.reorder_level) return <span className="inline-block rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">Low Stock</span>;
     return <span className="inline-block rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">In Stock</span>;
+  };
+
+  const getExpiryBadge = (expDate: string | null) => {
+    if (!expDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const exp = new Date(expDate);
+    exp.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger" title={`Expired on ${expDate}`}>
+          <AlertCircle className="h-3 w-3" /> Expired
+        </span>
+      );
+    }
+    if (diffDays <= 30) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600" title={`Expires in ${diffDays} days (${expDate})`}>
+          <Clock className="h-3 w-3" /> Exp: {diffDays}d
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-xs font-medium text-text-secondary" title={`Expires on ${expDate}`}>
+        <Calendar className="h-3 w-3 text-success" /> {expDate}
+      </span>
+    );
   };
 
   const totalPages = Math.ceil(products.length / itemsPerPage);
@@ -200,6 +231,7 @@ export default function Products() {
               <th className="px-4 py-3 text-right font-medium">Sell Price</th>
               <th className="px-4 py-3 text-right font-medium">Tax</th>
               <th className="px-4 py-3 text-center font-medium">Stock</th>
+              <th className="px-4 py-3 text-center font-medium">Expiry</th>
               <th className="px-4 py-3 text-center font-medium">Status</th>
               {canManage && <th className="px-4 py-3 text-center font-medium w-12"></th>}
             </tr>
@@ -214,6 +246,7 @@ export default function Products() {
                 <td className="px-4 py-3 text-right font-semibold text-text-primary">{fmt(p.selling_price)}</td>
                 <td className="px-4 py-3 text-right text-text-muted">{p.tax_rate}%</td>
                 <td className="px-4 py-3 text-center font-semibold text-text-primary">{p.stock_qty}</td>
+                <td className="px-4 py-3 text-center">{getExpiryBadge(p.expiry_date) || <span className="text-text-muted text-xs">-</span>}</td>
                 <td className="px-4 py-3 text-center">{stockBadge(p)}</td>
                 {canManage && (
                   <td className="px-4 py-3 text-center">
@@ -265,6 +298,10 @@ export default function Products() {
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Tax Rate (%)</label><input type="number" step="0.1" min="0" max="100" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">{editing ? 'Current Stock' : 'Initial Stock'}</label><input type="number" min="0" value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
               <div><label className="mb-1 block text-xs font-medium text-text-secondary">Reorder Level</label><input type="number" min="0" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" /></div>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Expiry Date (Cosmetics/Perishables)</label>
+                <input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} className="w-full rounded-lg border border-border bg-bg-input px-3 py-2.5 text-sm text-text-primary" />
+              </div>
             </div>
             <div className="mt-6 flex gap-3 justify-end">
               <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-primary">Cancel</button>

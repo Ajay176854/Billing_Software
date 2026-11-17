@@ -3,7 +3,7 @@ Product schemas.
 """
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 
 
 class ProductCreate(BaseModel):
@@ -17,6 +17,7 @@ class ProductCreate(BaseModel):
     stock_qty: int = Field(default=0, ge=0)
     reorder_level: int = Field(default=10, ge=0)
     unit: str = Field(default="pcs", max_length=20)
+    expiry_date: Optional[date] = None
 
 
 class ProductUpdate(BaseModel):
@@ -30,6 +31,7 @@ class ProductUpdate(BaseModel):
     stock_qty: Optional[int] = Field(None, ge=0)
     reorder_level: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
+    expiry_date: Optional[date] = None
     status: Optional[str] = Field(None, pattern="^(active|inactive)$")
 
 
@@ -46,6 +48,7 @@ class ProductResponse(BaseModel):
     stock_qty: int
     reorder_level: int
     unit: str
+    expiry_date: Optional[date] = None
     status: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
