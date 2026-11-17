@@ -99,7 +99,6 @@ export default function POS() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [showSearch, setShowSearch] = useState(false);
   const [billDiscount, setBillDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashReceived, setCashReceived] = useState('');
@@ -276,7 +275,6 @@ export default function POS() {
       saveCart(next);
       return next;
     });
-    setShowSearch(false);
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -348,6 +346,17 @@ export default function POS() {
     saveCart(emptyCart);
     setBillDiscount(0);
     setShowPayment(false);
+
+    const savedCustomerName = customerName;
+    const savedCustomerPhone = customerPhone;
+    const savedCustomerPlace = customerPlace;
+    const savedCustomerEmail = customerEmail;
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerPlace('');
+    setCustomerEmail('');
+    setTimeout(() => barcodeRef.current?.focus(), 100);
+
     // Instant Completed Sale dialog with zero UI wait time
     setCompletedSale({
       id: 0,
@@ -364,16 +373,6 @@ export default function POS() {
       subtotal: currentSubtotal,
       discount: currentDiscount,
     });
-
-    const savedCustomerName = customerName;
-    const savedCustomerPhone = customerPhone;
-    const savedCustomerPlace = customerPlace;
-    const savedCustomerEmail = customerEmail;
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerPlace('');
-    setCustomerEmail('');
-    setTimeout(() => barcodeRef.current?.focus(), 100);
 
     setProcessing(true);
     try {

@@ -112,7 +112,7 @@ if ($JsonPath -and (Test-Path $JsonPath)) {
 $doc.DocumentName = "Tax Invoice - $invoiceNo"
 
 $doc.add_PrintPage({
-    param($sender, $e)
+    param($printSender, $e)
     $g = $e.Graphics
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
