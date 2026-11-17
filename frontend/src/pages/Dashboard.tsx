@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { IndianRupee, Receipt, AlertTriangle, TrendingUp, CreditCard, X, Clock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatDateTime } from '../utils/date';
 
 interface DashboardData {
   today_sales: number;
@@ -380,7 +381,7 @@ export default function Dashboard() {
               <div key={s.id} className="flex items-center justify-between rounded-lg bg-bg-hover/50 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-text-primary">{s.invoice_no}</p>
-                  <p className="text-xs text-text-muted">{s.created_at ? new Date(s.created_at).toLocaleString('en-IN') : ''}</p>
+                  <p className="text-xs text-text-muted">{formatDateTime(s.created_at)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-text-primary">{fmt(s.total)}</p>

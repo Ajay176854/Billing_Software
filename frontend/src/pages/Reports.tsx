@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import { BarChart3, X, Phone, MapPin, Mail, ShoppingBag, ChevronRight, FileSpreadsheet, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Pagination from '../components/Pagination';
+import { formatDateTime } from '../utils/date';
 
 export default function Reports() {
   const [tab, setTab] = useState<'sales' | 'products' | 'inventory' | 'customers' | 'monitoring'>('sales');
@@ -15,9 +16,9 @@ export default function Reports() {
   const [customerTrafficData, setCustomerTrafficData] = useState<any[]>([]);
   const [monitoringData, setMonitoringData] = useState<any[]>([]);
   const [inventoryData, setInventoryData] = useState<any[]>([]);
-  
-  const [monitoringPeriod, setMonitoringPeriod] = useState<'daily'|'monthly'>('daily');
-  const [monitoringGroup, setMonitoringGroup] = useState<'overall'|'product'>('overall');
+
+  const [monitoringPeriod, setMonitoringPeriod] = useState<'daily' | 'monthly'>('daily');
+  const [monitoringGroup, setMonitoringGroup] = useState<'overall' | 'product'>('overall');
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -46,13 +47,13 @@ export default function Reports() {
       const dateStr = row.date;
       let start_date, end_date;
       if (dateStr.length === 7) { // YYYY-MM
-          const [y, m] = dateStr.split('-');
-          start_date = `${dateStr}-01T00:00:00`;
-          const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
-          end_date = `${dateStr}-${lastDay}T23:59:59`;
+        const [y, m] = dateStr.split('-');
+        start_date = `${dateStr}-01T00:00:00`;
+        const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+        end_date = `${dateStr}-${lastDay}T23:59:59`;
       } else {
-          start_date = `${dateStr}T00:00:00`;
-          end_date = `${dateStr}T23:59:59`;
+        start_date = `${dateStr}T00:00:00`;
+        end_date = `${dateStr}T23:59:59`;
       }
 
       if (monitoringGroup === 'overall') {
@@ -118,204 +119,204 @@ export default function Reports() {
     try {
       const workbook = new ExcelJS.Workbook();
 
-    // --- Sheet 1: Detailed Itemized Sales ---
-    const wsItemized = workbook.addWorksheet('Detailed Sales');
-    wsItemized.columns = [
-      { header: 'Date & Time', key: 'date', width: 20 },
-      { header: 'Invoice No', key: 'invoice_no', width: 22 },
-      { header: 'Product Name', key: 'product_name', width: 35 },
-      { header: 'Barcode', key: 'barcode', width: 18 },
-      { header: 'Qty', key: 'quantity', width: 10, style: { numFmt: '#,##0' } },
-      { header: 'Price', key: 'price', width: 15, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Tax', key: 'tax', width: 15, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Total', key: 'total', width: 15, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Profit', key: 'profit', width: 15, style: { numFmt: '₹#,##0.00' } },
-    ];
+      // --- Sheet 1: Detailed Itemized Sales ---
+      const wsItemized = workbook.addWorksheet('Detailed Sales');
+      wsItemized.columns = [
+        { header: 'Date & Time', key: 'date', width: 20 },
+        { header: 'Invoice No', key: 'invoice_no', width: 22 },
+        { header: 'Product Name', key: 'product_name', width: 35 },
+        { header: 'Barcode', key: 'barcode', width: 18 },
+        { header: 'Qty', key: 'quantity', width: 10, style: { numFmt: '#,##0' } },
+        { header: 'Price', key: 'price', width: 15, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Tax', key: 'tax', width: 15, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Total', key: 'total', width: 15, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Profit', key: 'profit', width: 15, style: { numFmt: '₹#,##0.00' } },
+      ];
 
-    const rowsItemized = itemizedData.map(d => [
-      d.date, d.invoice_no, d.product_name || '-', d.barcode || '-', d.quantity, d.price, d.tax, d.total, d.profit
-    ]);
+      const rowsItemized = itemizedData.map(d => [
+        d.date, d.invoice_no, d.product_name || '-', d.barcode || '-', d.quantity, d.price, d.tax, d.total, d.profit
+      ]);
 
-    if (rowsItemized.length > 0) {
-      wsItemized.addTable({
-        name: 'ItemizedTable',
-        ref: 'A1',
-        headerRow: true,
-        totalsRow: true,
-        style: { theme: 'TableStyleMedium4', showRowStripes: true },
-        columns: [
-          { name: 'Date & Time', filterButton: true },
-          { name: 'Invoice No', filterButton: true },
-          { name: 'Product Name', filterButton: true },
-          { name: 'Barcode', filterButton: true },
-          { name: 'Qty', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Price', filterButton: true },
-          { name: 'Tax', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Total', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
-        ],
-        rows: rowsItemized,
-      });
-      wsItemized.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    }
-
-    // --- Sheet 2: Daily Sales ---
-    const wsSales = workbook.addWorksheet('Daily Sales Summary');
-    wsSales.columns = [
-      { header: 'Date', key: 'date', width: 15 },
-      { header: 'Bills Count', key: 'bills', width: 15, style: { numFmt: '#,##0' } },
-      { header: 'Total Sales', key: 'sales', width: 20, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Discount', key: 'discount', width: 20, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Tax', key: 'tax', width: 20, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
-    ];
-
-    const rowsSales = salesData.map(d => [d.date, d.total_bills, d.total_sales, d.total_discount, d.total_tax, d.total_profit]);
-
-    if (rowsSales.length > 0) {
-      wsSales.addTable({
-        name: 'SalesTable',
-        ref: 'A1',
-        headerRow: true,
-        totalsRow: true,
-        style: { theme: 'TableStyleMedium2', showRowStripes: true },
-        columns: [
-          { name: 'Date', filterButton: true },
-          { name: 'Bills Count', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Total Sales', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Discount', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Tax', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
-        ],
-        rows: rowsSales,
-      });
-      wsSales.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    }
-
-    // --- Sheet 2: Product Sales ---
-    const wsProd = workbook.addWorksheet('Product Sales');
-    wsProd.columns = [
-      { header: 'Rank', key: 'rank', width: 10, style: { numFmt: '#,##0' } },
-      { header: 'Product Name', key: 'product', width: 40 },
-      { header: 'Barcode', key: 'barcode', width: 20 },
-      { header: 'Units Sold', key: 'units', width: 15, style: { numFmt: '#,##0' } },
-      { header: 'Total Revenue', key: 'revenue', width: 20, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Total Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
-    ];
-
-    const rowsProd = productData.map((p, i) => [i + 1, p.product_name || '-', p.barcode || '-', p.total_qty_sold, p.total_revenue, p.total_profit]);
-
-    if (rowsProd.length > 0) {
-      wsProd.addTable({
-        name: 'ProductsTable',
-        ref: 'A1',
-        headerRow: true,
-        totalsRow: true,
-        style: { theme: 'TableStyleMedium3', showRowStripes: true },
-        columns: [
-          { name: 'Rank', filterButton: true },
-          { name: 'Product Name', filterButton: true },
-          { name: 'Barcode', filterButton: true },
-          { name: 'Units Sold', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Total Revenue', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Total Profit', filterButton: true, totalsRowFunction: 'sum' },
-        ],
-        rows: rowsProd,
-      });
-      wsProd.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    }
-
-    // --- Sheet 4: Customer Traffic ---
-    const wsCustomer = workbook.addWorksheet('Customer Traffic');
-    wsCustomer.columns = [
-      { header: 'Rank', key: 'rank', width: 10, style: { numFmt: '#,##0' } },
-      { header: 'Customer Name', key: 'name', width: 30 },
-      { header: 'Phone', key: 'phone', width: 20 },
-      { header: 'Total Visits', key: 'visits', width: 15, style: { numFmt: '#,##0' } },
-      { header: 'Total Spent', key: 'spent', width: 20, style: { numFmt: '₹#,##0.00' } },
-      { header: 'Last Visit', key: 'last_visit', width: 25 },
-    ];
-    
-    const rowsCustomer = customerTrafficData.map((c, i) => [
-      i + 1, c.customer_name || 'Unknown', c.customer_phone, c.total_visits, c.total_spent, 
-      c.last_visit ? new Date(c.last_visit).toLocaleString() : '-'
-    ]);
-    if (rowsCustomer.length > 0) {
-      wsCustomer.addTable({
-        name: 'CustomersTable',
-        ref: 'A1',
-        headerRow: true,
-        totalsRow: true,
-        style: { theme: 'TableStyleMedium5', showRowStripes: true },
-        columns: [
-          { name: 'Rank', filterButton: true },
-          { name: 'Customer Name', filterButton: true },
-          { name: 'Phone', filterButton: true },
-          { name: 'Total Visits', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Total Spent', filterButton: true, totalsRowFunction: 'sum' },
-          { name: 'Last Visit', filterButton: true },
-        ],
-        rows: rowsCustomer,
-      });
-      wsCustomer.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    }
-
-    // --- Sheet 5: Monitoring Data ---
-    if (monitoringData && monitoringData.length > 0) {
-      const wsMonitoring = workbook.addWorksheet('Monitoring Data');
-      if (monitoringGroup === 'overall') {
-        wsMonitoring.columns = [
-          { header: 'Date', key: 'date', width: 15 },
-          { header: 'Bills Count', key: 'bills', width: 15, style: { numFmt: '#,##0' } },
-          { header: 'Total Sales', key: 'sales', width: 20, style: { numFmt: '₹#,##0.00' } },
-          { header: 'Total Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
-        ];
-        
-        const rowsMonitoring = monitoringData.map(d => [d.date, d.total_bills, d.total_sales, d.total_profit]);
-        
-        wsMonitoring.addTable({
-          name: 'MonitoringOverallTable',
+      if (rowsItemized.length > 0) {
+        wsItemized.addTable({
+          name: 'ItemizedTable',
           ref: 'A1',
           headerRow: true,
           totalsRow: true,
-          style: { theme: 'TableStyleMedium6', showRowStripes: true },
+          style: { theme: 'TableStyleMedium4', showRowStripes: true },
+          columns: [
+            { name: 'Date & Time', filterButton: true },
+            { name: 'Invoice No', filterButton: true },
+            { name: 'Product Name', filterButton: true },
+            { name: 'Barcode', filterButton: true },
+            { name: 'Qty', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Price', filterButton: true },
+            { name: 'Tax', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Total', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
+          ],
+          rows: rowsItemized,
+        });
+        wsItemized.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+
+      // --- Sheet 2: Daily Sales ---
+      const wsSales = workbook.addWorksheet('Daily Sales Summary');
+      wsSales.columns = [
+        { header: 'Date', key: 'date', width: 15 },
+        { header: 'Bills Count', key: 'bills', width: 15, style: { numFmt: '#,##0' } },
+        { header: 'Total Sales', key: 'sales', width: 20, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Discount', key: 'discount', width: 20, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Tax', key: 'tax', width: 20, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
+      ];
+
+      const rowsSales = salesData.map(d => [d.date, d.total_bills, d.total_sales, d.total_discount, d.total_tax, d.total_profit]);
+
+      if (rowsSales.length > 0) {
+        wsSales.addTable({
+          name: 'SalesTable',
+          ref: 'A1',
+          headerRow: true,
+          totalsRow: true,
+          style: { theme: 'TableStyleMedium2', showRowStripes: true },
           columns: [
             { name: 'Date', filterButton: true },
             { name: 'Bills Count', filterButton: true, totalsRowFunction: 'sum' },
             { name: 'Total Sales', filterButton: true, totalsRowFunction: 'sum' },
-            { name: 'Total Profit', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Discount', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Tax', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
           ],
-          rows: rowsMonitoring,
+          rows: rowsSales,
         });
-      } else {
-        wsMonitoring.columns = [
-          { header: 'Date', key: 'date', width: 15 },
-          { header: 'Product Name', key: 'product', width: 40 },
-          { header: 'Units Sold', key: 'qty', width: 15, style: { numFmt: '#,##0' } },
-          { header: 'Revenue', key: 'revenue', width: 20, style: { numFmt: '₹#,##0.00' } },
-          { header: 'Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
-        ];
-        
-        const rowsMonitoring = monitoringData.map(d => [d.date, d.product_name, d.qty_sold, d.revenue, d.profit]);
-        
-        wsMonitoring.addTable({
-          name: 'MonitoringProductTable',
+        wsSales.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+
+      // --- Sheet 2: Product Sales ---
+      const wsProd = workbook.addWorksheet('Product Sales');
+      wsProd.columns = [
+        { header: 'Rank', key: 'rank', width: 10, style: { numFmt: '#,##0' } },
+        { header: 'Product Name', key: 'product', width: 40 },
+        { header: 'Barcode', key: 'barcode', width: 20 },
+        { header: 'Units Sold', key: 'units', width: 15, style: { numFmt: '#,##0' } },
+        { header: 'Total Revenue', key: 'revenue', width: 20, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Total Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
+      ];
+
+      const rowsProd = productData.map((p, i) => [i + 1, p.product_name || '-', p.barcode || '-', p.total_qty_sold, p.total_revenue, p.total_profit]);
+
+      if (rowsProd.length > 0) {
+        wsProd.addTable({
+          name: 'ProductsTable',
           ref: 'A1',
           headerRow: true,
           totalsRow: true,
-          style: { theme: 'TableStyleMedium6', showRowStripes: true },
+          style: { theme: 'TableStyleMedium3', showRowStripes: true },
           columns: [
-            { name: 'Date', filterButton: true },
+            { name: 'Rank', filterButton: true },
             { name: 'Product Name', filterButton: true },
+            { name: 'Barcode', filterButton: true },
             { name: 'Units Sold', filterButton: true, totalsRowFunction: 'sum' },
-            { name: 'Revenue', filterButton: true, totalsRowFunction: 'sum' },
-            { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Total Revenue', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Total Profit', filterButton: true, totalsRowFunction: 'sum' },
           ],
-          rows: rowsMonitoring,
+          rows: rowsProd,
         });
+        wsProd.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
       }
-      wsMonitoring.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    }
+
+      // --- Sheet 4: Customer Traffic ---
+      const wsCustomer = workbook.addWorksheet('Customer Traffic');
+      wsCustomer.columns = [
+        { header: 'Rank', key: 'rank', width: 10, style: { numFmt: '#,##0' } },
+        { header: 'Customer Name', key: 'name', width: 30 },
+        { header: 'Phone', key: 'phone', width: 20 },
+        { header: 'Total Visits', key: 'visits', width: 15, style: { numFmt: '#,##0' } },
+        { header: 'Total Spent', key: 'spent', width: 20, style: { numFmt: '₹#,##0.00' } },
+        { header: 'Last Visit', key: 'last_visit', width: 25 },
+      ];
+
+      const rowsCustomer = customerTrafficData.map((c, i) => [
+        i + 1, c.customer_name || 'Unknown', c.customer_phone, c.total_visits, c.total_spent,
+        c.last_visit ? formatDateTime(c.last_visit) : '-'
+      ]);
+      if (rowsCustomer.length > 0) {
+        wsCustomer.addTable({
+          name: 'CustomersTable',
+          ref: 'A1',
+          headerRow: true,
+          totalsRow: true,
+          style: { theme: 'TableStyleMedium5', showRowStripes: true },
+          columns: [
+            { name: 'Rank', filterButton: true },
+            { name: 'Customer Name', filterButton: true },
+            { name: 'Phone', filterButton: true },
+            { name: 'Total Visits', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Total Spent', filterButton: true, totalsRowFunction: 'sum' },
+            { name: 'Last Visit', filterButton: true },
+          ],
+          rows: rowsCustomer,
+        });
+        wsCustomer.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+
+      // --- Sheet 5: Monitoring Data ---
+      if (monitoringData && monitoringData.length > 0) {
+        const wsMonitoring = workbook.addWorksheet('Monitoring Data');
+        if (monitoringGroup === 'overall') {
+          wsMonitoring.columns = [
+            { header: 'Date', key: 'date', width: 15 },
+            { header: 'Bills Count', key: 'bills', width: 15, style: { numFmt: '#,##0' } },
+            { header: 'Total Sales', key: 'sales', width: 20, style: { numFmt: '₹#,##0.00' } },
+            { header: 'Total Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
+          ];
+
+          const rowsMonitoring = monitoringData.map(d => [d.date, d.total_bills, d.total_sales, d.total_profit]);
+
+          wsMonitoring.addTable({
+            name: 'MonitoringOverallTable',
+            ref: 'A1',
+            headerRow: true,
+            totalsRow: true,
+            style: { theme: 'TableStyleMedium6', showRowStripes: true },
+            columns: [
+              { name: 'Date', filterButton: true },
+              { name: 'Bills Count', filterButton: true, totalsRowFunction: 'sum' },
+              { name: 'Total Sales', filterButton: true, totalsRowFunction: 'sum' },
+              { name: 'Total Profit', filterButton: true, totalsRowFunction: 'sum' },
+            ],
+            rows: rowsMonitoring,
+          });
+        } else {
+          wsMonitoring.columns = [
+            { header: 'Date', key: 'date', width: 15 },
+            { header: 'Product Name', key: 'product', width: 40 },
+            { header: 'Units Sold', key: 'qty', width: 15, style: { numFmt: '#,##0' } },
+            { header: 'Revenue', key: 'revenue', width: 20, style: { numFmt: '₹#,##0.00' } },
+            { header: 'Profit', key: 'profit', width: 20, style: { numFmt: '₹#,##0.00' } },
+          ];
+
+          const rowsMonitoring = monitoringData.map(d => [d.date, d.product_name, d.qty_sold, d.revenue, d.profit]);
+
+          wsMonitoring.addTable({
+            name: 'MonitoringProductTable',
+            ref: 'A1',
+            headerRow: true,
+            totalsRow: true,
+            style: { theme: 'TableStyleMedium6', showRowStripes: true },
+            columns: [
+              { name: 'Date', filterButton: true },
+              { name: 'Product Name', filterButton: true },
+              { name: 'Units Sold', filterButton: true, totalsRowFunction: 'sum' },
+              { name: 'Revenue', filterButton: true, totalsRowFunction: 'sum' },
+              { name: 'Profit', filterButton: true, totalsRowFunction: 'sum' },
+            ],
+            rows: rowsMonitoring,
+          });
+        }
+        wsMonitoring.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      }
 
       // --- Sheet 6: Overall Product Inventory & Performance ---
       const wsInventory = workbook.addWorksheet('Overall Product Inventory');
@@ -396,7 +397,7 @@ export default function Reports() {
           binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192)));
         }
         const base64 = btoa(binary);
-        
+
         // @ts-ignore
         const saved = await window.pywebview.api.save_excel(base64, filename);
         if (saved) {
@@ -602,7 +603,10 @@ export default function Reports() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#2a3050" />
                     <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
                     <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: '#1a1f35', border: '1px solid #2a3050', borderRadius: '8px', color: '#f1f5f9', fontSize: '12px' }} formatter={(value: any, name: string) => [fmt(value), name === 'total_sales' ? 'Sales' : 'Profit']} />
+                    <Tooltip
+                      contentStyle={{ background: '#1a1f35', border: '1px solid #2a3050', borderRadius: '8px', color: '#f1f5f9', fontSize: '12px' }}
+                      formatter={(value: any, name: string) => [fmt(value), (name === 'total_sales' || name === 'Sales') ? 'Total Sales' : 'Net Profit']}
+                    />
                     <Bar dataKey="total_sales" name="Sales" fill="#6366f1" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="total_profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -799,19 +803,19 @@ export default function Reports() {
         ) : tab === 'monitoring' ? (
           <div className="space-y-4">
             <div className="flex gap-4">
-               <select value={monitoringPeriod} onChange={(e) => setMonitoringPeriod(e.target.value as any)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary">
-                 <option value="daily">Daily</option>
-                 <option value="monthly">Monthly</option>
-               </select>
-               <select value={monitoringGroup} onChange={(e) => setMonitoringGroup(e.target.value as any)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary">
-                 <option value="overall">Overall Business</option>
-                 <option value="product">By Product</option>
-               </select>
+              <select value={monitoringPeriod} onChange={(e) => setMonitoringPeriod(e.target.value as any)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary">
+                <option value="daily">Daily</option>
+                <option value="monthly">Monthly</option>
+              </select>
+              <select value={monitoringGroup} onChange={(e) => setMonitoringGroup(e.target.value as any)} className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary">
+                <option value="overall">Overall Business</option>
+                <option value="product">By Product</option>
+              </select>
             </div>
-            
+
             <div className="rounded-xl border border-border bg-bg-card p-5">
               <h3 className="mb-4 text-sm font-semibold text-text-primary">
-                 {monitoringPeriod === 'daily' ? 'Daily' : 'Monthly'} {monitoringGroup === 'overall' ? 'Overall Trends' : 'Product Trends'}
+                {monitoringPeriod === 'daily' ? 'Daily' : 'Monthly'} {monitoringGroup === 'overall' ? 'Overall Trends' : 'Product Trends'}
               </h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -821,15 +825,15 @@ export default function Reports() {
                     <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                     <Tooltip contentStyle={{ background: '#1a1f35', border: '1px solid #2a3050', borderRadius: '8px', color: '#f1f5f9', fontSize: '12px' }} formatter={(value: any, name: string) => [fmt(value), name]} />
                     {monitoringGroup === 'overall' ? (
-                       <>
-                         <Bar dataKey="total_sales" name="Sales" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                         <Bar dataKey="total_profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
-                       </>
+                      <>
+                        <Bar dataKey="total_sales" name="Sales" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total_profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
                     ) : (
-                       <>
-                         <Bar dataKey="revenue" name="Revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                         <Bar dataKey="profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
-                       </>
+                      <>
+                        <Bar dataKey="revenue" name="Revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -900,12 +904,12 @@ export default function Reports() {
                     <td className="px-4 py-3 text-right font-semibold text-text-primary">{c.total_visits}</td>
                     <td className="px-4 py-3 text-right font-semibold text-success">{fmt(c.total_spent)}</td>
                     <td className="px-4 py-3 text-right text-text-muted text-xs">
-                      {c.last_visit ? new Date(c.last_visit).toLocaleString() : '-'}
+                      {c.last_visit ? formatDateTime(c.last_visit) : '-'}
                     </td>
                     <td className="px-4 py-3 text-center"><ChevronRight className="h-4 w-4 text-text-muted" /></td>
                   </tr>
                 ))}
-                  {paginatedCustomers.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-text-muted"><BarChart3 className="mx-auto mb-2 h-8 w-8 opacity-30" />No customer traffic data</td></tr>}
+                {paginatedCustomers.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-text-muted"><BarChart3 className="mx-auto mb-2 h-8 w-8 opacity-30" />No customer traffic data</td></tr>}
               </tbody>
             </table>
             <Pagination
@@ -988,7 +992,7 @@ export default function Reports() {
                             <span className="text-sm font-bold text-text-primary">{fmt(p.total)}</span>
                           </div>
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs text-text-muted">{p.created_at ? new Date(p.created_at).toLocaleString('en-IN') : ''}</span>
+                            <span className="text-xs text-text-muted">{formatDateTime(p.created_at)}</span>
                             <span className="inline-block rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent capitalize">{p.payment_method}</span>
                           </div>
                           <div className="space-y-1">

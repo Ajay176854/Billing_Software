@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { Search, Receipt, Eye } from 'lucide-react';
 import Pagination from '../components/Pagination';
+import { formatDateTime } from '../utils/date';
 
 export default function Sales() {
   const [sales, setSales] = useState<any[]>([]);
@@ -94,7 +95,7 @@ export default function Sales() {
             {paginatedSales.map((s: any) => (
               <tr key={s.id} className="border-b border-border/30 transition-colors hover:bg-bg-hover/50 cursor-pointer" onClick={() => navigate(`/sales/${s.id}`)}>
                 <td className="px-4 py-3 font-mono text-sm font-medium text-accent">{s.invoice_no}</td>
-                <td className="px-4 py-3 text-text-muted text-xs">{s.created_at ? new Date(s.created_at).toLocaleString('en-IN') : ''}</td>
+                <td className="px-4 py-3 text-text-muted text-xs">{formatDateTime(s.created_at)}</td>
                 <td className="px-4 py-3 text-text-primary">{s.user_name}</td>
                 <td className="px-4 py-3 text-center text-text-muted">{s.items_count}</td>
                 <td className="px-4 py-3 text-center"><span className="inline-block rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent capitalize">{s.payment_method}</span></td>

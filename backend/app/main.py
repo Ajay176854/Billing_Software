@@ -61,34 +61,8 @@ async def lifespan(app: FastAPI):
         threading.Thread(target=_init_db_background, daemon=True).start()
 
         # Start WhatsApp Baileys background service silently
-        def _start_whatsapp_service():
-            try:
-                import subprocess
-                candidates = [
-                    Path(__file__).resolve().parent.parent / "whatsapp_service",
-                    Path(getattr(sys, "_MEIPASS", "")) / "whatsapp_service",
-                    Path(sys.executable).parent / "whatsapp_service",
-                    Path(sys.executable).parent / "backend" / "whatsapp_service",
-                ]
-                js_dir = None
-                for c in candidates:
-                    if (c / "server.js").exists():
-                        js_dir = c
-                        break
-
-                if js_dir and (js_dir / "server.js").exists():
-                    creation_flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
-                    subprocess.Popen(
-                        ["node", "server.js"],
-                        cwd=str(js_dir),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        creationflags=creation_flags
-                    )
-            except Exception as w_err:
-                print(f"WhatsApp service launch warning: {w_err}")
-
-        threading.Thread(target=_start_whatsapp_service, daemon=True).start()
+        from app.whatsapp_manager import ensure_whatsapp_running
+        ensure_whatsapp_running()
     except Exception as e:
         # Ignore errors in serverless environments (like Vercel) where filesystem is read-only
         print(f"Lifespan startup warning: {e}")

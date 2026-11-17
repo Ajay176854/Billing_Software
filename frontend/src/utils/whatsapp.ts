@@ -42,14 +42,9 @@ export function buildWhatsAppBillText(data: WhatsAppBillData): string {
   const storeName = (data.storeName || 'MOIRA LUXE').toUpperCase();
   const customerName = data.customerName?.trim() || 'Valued Customer';
   const payMode = (data.paymentMethod || 'CASH').toUpperCase();
-  const dateStr = data.createdAt || new Date().toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const dateStr = data.createdAt
+    ? (data.createdAt.includes('am') || data.createdAt.includes('pm') ? data.createdAt : formatDateTime(data.createdAt))
+    : formatDateTime(new Date());
 
   const lines: string[] = [];
   lines.push(`💎 *${storeName}* 💎`);
@@ -98,6 +93,7 @@ export function buildWhatsAppBillText(data: WhatsAppBillData): string {
 
 import api from '../api/client';
 import toast from 'react-hot-toast';
+import { formatDateTime } from './date';
 
 export function openWhatsAppBill(data: WhatsAppBillData): boolean {
   const cleanPhone = formatWhatsAppPhone(data.customerPhone);
@@ -120,31 +116,45 @@ export function openWhatsAppBill(data: WhatsAppBillData): boolean {
 }
 
 /**
- * Autonomous delivery first via linked Baileys engine,
- * falling back to wa.me if unlinked.
+ * Autonomous delivery directly via linked Baileys engine.
+ * Never redirects or opens browser tabs unexpectedly.
  */
 export async function dispatchWhatsAppBill(data: WhatsAppBillData): Promise<boolean> {
   const cleanPhone = formatWhatsAppPhone(data.customerPhone);
   if (!cleanPhone) {
+    toast.error('Customer phone number is missing on this invoice');
     return false;
   }
 
   const message = buildWhatsAppBillText(data);
 
-  // 1. Try autonomous direct delivery via local Baileys engine
+  // 1. Send direct WhatsApp message via local Baileys service
   try {
     const res = await api.post('/whatsapp/send', {
       phone: cleanPhone,
       message: message,
     });
     if (res.data?.success) {
-      toast.success(`📱 WhatsApp Bill delivered autonomously to +${cleanPhone}!`);
+      toast.success(`📱 WhatsApp Bill sent directly to +${cleanPhone}!`);
       return true;
     }
-  } catch (err) {
-    // If Baileys not connected yet or offline, proceed to fallback
+  } catch (err: any) {
+    const detail = err.response?.data?.detail || err.response?.data?.error || err.message;
+    console.warn('Direct WhatsApp delivery failed:', detail);
+
+    if (detail && detail.toLowerCase().includes('not connected')) {
+      toast.error(
+        '⚠️ WhatsApp is not linked yet! Go to Settings → WhatsApp Integration to scan the QR code.',
+        { duration: 5000 }
+      );
+    } else {
+      toast.error(
+        `⚠️ Failed to send WhatsApp bill: ${detail || 'WhatsApp engine offline'}. Check Settings → WhatsApp.`,
+        { duration: 5000 }
+      );
+    }
+    return false;
   }
 
-  // 2. Seamless fallback: open wa.me
-  return openWhatsAppBill(data);
+  return false;
 }

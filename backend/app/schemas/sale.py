@@ -1,9 +1,9 @@
 """
 Sale / Billing schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # --- Cart / Billing Request ---
@@ -60,6 +60,14 @@ class SaleResponse(BaseModel):
     items: List[SaleItemResponse] = []
     created_at: Optional[datetime] = None
 
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
     class Config:
         from_attributes = True
 
@@ -74,6 +82,14 @@ class SaleListResponse(BaseModel):
     status: str
     items_count: int = 0
     created_at: Optional[datetime] = None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
     class Config:
         from_attributes = True

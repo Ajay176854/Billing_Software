@@ -8,6 +8,7 @@ import urllib.request
 import json
 
 from app.auth import get_current_user
+from app.whatsapp_manager import ensure_whatsapp_running
 
 from datetime import datetime
 
@@ -34,6 +35,7 @@ def _call_service(endpoint: str, method: str = "GET", data: Optional[dict] = Non
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
+        ensure_whatsapp_running()
         return {
             "connected": False,
             "state": "offline",
@@ -47,6 +49,13 @@ def _call_service(endpoint: str, method: str = "GET", data: Optional[dict] = Non
 def get_whatsapp_status(current_user=Depends(get_current_user)):
     """Fetch current connection status and QR code."""
     res = _call_service("status", method="GET")
+    return res
+
+
+@router.post("/refresh-qr")
+def refresh_whatsapp_qr(current_user=Depends(get_current_user)):
+    """Force generate a fresh WhatsApp QR code."""
+    res = _call_service("refresh-qr", method="POST", data={})
     return res
 
 

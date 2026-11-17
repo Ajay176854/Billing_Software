@@ -56,7 +56,7 @@ def get_dashboard_stats(db: Session) -> dict:
             "invoice_no": s.invoice_no,
             "total": s.total,
             "payment_method": s.payment_method,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "created_at": (s.created_at.replace(tzinfo=timezone.utc).isoformat() if s.created_at.tzinfo is None else s.created_at.isoformat()) if s.created_at else None,
         }
         for s in recent_sales
     ]
@@ -347,7 +347,7 @@ def get_customer_traffic_report(db: Session, start_date: datetime = None, end_da
             "customer_name": name_str,
             "total_visits": data["total_visits"],
             "total_spent": data["total_spent"],
-            "last_visit": data["last_visit"].isoformat() if data["last_visit"] else None
+            "last_visit": (data["last_visit"].replace(tzinfo=timezone.utc).isoformat() if data["last_visit"].tzinfo is None else data["last_visit"].isoformat()) if data["last_visit"] else None
         })
         
     # Sort by total_spent descending

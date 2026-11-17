@@ -1,9 +1,9 @@
 """
 Stock / Inventory schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class StockInRequest(BaseModel):
@@ -30,6 +30,14 @@ class StockTransactionResponse(BaseModel):
     user_id: int
     user_name: Optional[str] = None
     created_at: Optional[datetime] = None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
     class Config:
         from_attributes = True

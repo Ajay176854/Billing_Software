@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Printer, XCircle, Share2 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { dispatchWhatsAppBill } from '../utils/whatsapp';
+import { formatDateTime } from '../utils/date';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
@@ -41,7 +42,7 @@ export default function InvoiceDetail() {
 
   const [printing, setPrinting] = useState(false);
 
-  const printInvoice = async () => { 
+  const printInvoice = async () => {
     if (printing || !sale) return;
     setPrinting(true);
 
@@ -128,7 +129,7 @@ export default function InvoiceDetail() {
         customerName: sale.customer_name,
         customerPhone: sale.customer_phone,
         invoiceNo: sale.invoice_no,
-        createdAt: sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : undefined,
+        createdAt: sale.created_at ? formatDateTime(sale.created_at) : undefined,
         paymentMethod: sale.payment_method,
         items: (sale.items || []).map((i: any) => ({
           name: i.product_name || i.product?.name || "Item",
@@ -156,19 +157,19 @@ export default function InvoiceDetail() {
         <button onClick={() => navigate('/sales')} className="rounded-lg border border-border p-2 text-text-muted hover:text-text-primary"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-text-primary">{sale.invoice_no}</h1>
-          <p className="text-sm text-text-muted">{sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : ''}</p>
+          <p className="text-sm text-text-muted">{sale.created_at ? formatDateTime(sale.created_at) : ''}</p>
         </div>
         <div className="flex gap-2">
-          <button 
-            onClick={shareOnWhatsApp} 
+          <button
+            onClick={shareOnWhatsApp}
             disabled={sharingWa}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
             title="Send E-Invoice directly via WhatsApp"
           >
             <Share2 className="h-4 w-4" /> {sharingWa ? 'Sending...' : '📱 WhatsApp Bill'}
           </button>
-          <button 
-            onClick={printInvoice} 
+          <button
+            onClick={printInvoice}
             disabled={printing}
             className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:border-accent hover:text-accent disabled:opacity-50"
           >

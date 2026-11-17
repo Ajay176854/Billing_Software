@@ -9,6 +9,7 @@ export default function WhatsAppSettings() {
   const [testPhone, setTestPhone] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [refreshingQR, setRefreshingQR] = useState(false);
   const pollTimerRef = useRef<any>(null);
 
   const fetchStatus = async () => {
@@ -22,11 +23,24 @@ export default function WhatsAppSettings() {
     }
   };
 
+  const handleRefreshQR = async () => {
+    setRefreshingQR(true);
+    try {
+      await api.post('/whatsapp/refresh-qr');
+      toast.success('Generating fresh QR code...');
+      await fetchStatus();
+    } catch {
+      await fetchStatus();
+    } finally {
+      setRefreshingQR(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
 
-    // Poll status every 3 seconds to auto-detect QR scan
-    pollTimerRef.current = setInterval(fetchStatus, 3000);
+    // Fast poll status every 2 seconds to auto-detect QR scan or fresh code
+    pollTimerRef.current = setInterval(fetchStatus, 2000);
     return () => clearInterval(pollTimerRef.current);
   }, []);
 
@@ -85,11 +99,12 @@ export default function WhatsAppSettings() {
         </div>
 
         <button
-          onClick={fetchStatus}
-          disabled={loading}
+          onClick={handleRefreshQR}
+          disabled={loading || refreshingQR}
           className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:border-accent hover:text-accent transition-colors"
+          title="Regenerate a brand new QR code"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`h-3.5 w-3.5 ${loading || refreshingQR ? 'animate-spin' : ''}`} /> Reload QR
         </button>
       </div>
 
@@ -160,12 +175,42 @@ export default function WhatsAppSettings() {
                     <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
                     Waiting for phone scan...
                   </div>
+                  <div>
+                    <button
+                      onClick={handleRefreshQR}
+                      disabled={refreshingQR}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 py-1.5 text-xs font-semibold text-text-primary hover:border-accent hover:text-accent shadow-sm transition-all"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${refreshingQR ? 'animate-spin' : ''}`} />
+                      {refreshingQR ? 'Generating fresh code...' : '🔄 Expired? Click to Refresh QR'}
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-52 text-center text-text-muted space-y-2">
-                  <QrCode className="h-10 w-10 opacity-30 animate-pulse" />
-                  <p className="text-sm">Starting WhatsApp engine...</p>
-                  <p className="text-xs">QR code will appear here in a few seconds</p>
+                <div className="flex flex-col items-center justify-center p-4 text-center text-text-muted space-y-3 min-h-[220px]">
+                  <QrCode className="h-10 w-10 text-accent/50 animate-pulse" />
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Starting WhatsApp engine...</p>
+                    <p className="text-xs text-text-muted mt-0.5">QR code will appear here once ready</p>
+                  </div>
+
+                  <div className="rounded-lg border border-border/80 bg-bg-card p-3 text-left text-xs space-y-1.5 max-w-xs shadow-sm">
+                    <p className="font-semibold text-text-secondary flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      Running on another PC/Laptop?
+                    </p>
+                    <p className="text-[11px] text-text-muted leading-relaxed">
+                      To run the WhatsApp background engine on a new computer, install <strong>Node.js</strong> once (100% free):
+                    </p>
+                    <a
+                      href="https://nodejs.org/en/download"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline pt-0.5"
+                    >
+                      🔗 Download Node.js (nodejs.org) &rarr;
+                    </a>
+                  </div>
                 </div>
               )}
             </div>

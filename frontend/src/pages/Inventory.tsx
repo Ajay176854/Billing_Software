@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import api from '../api/client';
 import { Warehouse, AlertTriangle, XCircle, ArrowDownUp, RefreshCw, Clock } from 'lucide-react';
 import Pagination from '../components/Pagination';
+import { formatDateTime } from '../utils/date';
 
 export default function Inventory() {
   const [tab, setTab] = useState<'all' | 'low' | 'out' | 'expiring' | 'history'>('all');
   const [products, setProducts] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const itemsPerPage = 15;
@@ -24,13 +25,13 @@ export default function Inventory() {
       else if (tab === 'expiring') { const res = await api.get('/inventory/expiring'); setProducts(res.data); }
       else if (tab === 'history') { const res = await api.get('/inventory/transactions?limit=500'); setTransactions(res.data); }
       else { const res = await api.get('/products'); setProducts(res.data); }
-    } catch {}
+    } catch { }
     setLoading(false);
     setRefreshing(false);
   };
 
-  useEffect(() => { 
-    fetchData(); 
+  useEffect(() => {
+    fetchData();
     setCurrentPage(1);
   }, [tab]);
 
@@ -92,7 +93,7 @@ export default function Inventory() {
             <tbody>
               {paginatedData.map((t: any) => (
                 <tr key={t.id} className="border-b border-border/30 hover:bg-bg-hover/50">
-                  <td className="px-4 py-3 text-text-muted text-xs">{t.created_at ? new Date(t.created_at).toLocaleString('en-IN') : ''}</td>
+                  <td className="px-4 py-3 text-text-muted text-xs">{formatDateTime(t.created_at)}</td>
                   <td className="px-4 py-3 font-medium text-text-primary">{t.product_name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium
@@ -108,12 +109,12 @@ export default function Inventory() {
               {paginatedData.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-text-muted">No transactions found</td></tr>}
             </tbody>
           </table>
-          <Pagination 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={setCurrentPage} 
-            totalItems={currentData.length} 
-            itemsPerPage={itemsPerPage} 
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={currentData.length}
+            itemsPerPage={itemsPerPage}
           />
         </div>
       ) : (
@@ -135,9 +136,9 @@ export default function Inventory() {
                 let expBadge = null;
                 if (p.expiry_date) {
                   const today = new Date();
-                  today.setHours(0,0,0,0);
+                  today.setHours(0, 0, 0, 0);
                   const exp = new Date(p.expiry_date);
-                  exp.setHours(0,0,0,0);
+                  exp.setHours(0, 0, 0, 0);
                   const diff = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                   if (diff < 0) {
                     expBadge = <span className="rounded bg-danger/15 px-2 py-0.5 text-xs font-bold text-danger">Expired</span>;
@@ -167,12 +168,12 @@ export default function Inventory() {
               {paginatedData.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-text-muted">No products found</td></tr>}
             </tbody>
           </table>
-          <Pagination 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={setCurrentPage} 
-            totalItems={currentData.length} 
-            itemsPerPage={itemsPerPage} 
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={currentData.length}
+            itemsPerPage={itemsPerPage}
           />
         </div>
       )}
