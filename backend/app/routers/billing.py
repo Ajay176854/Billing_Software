@@ -2,12 +2,13 @@
 Billing router — complete a sale.
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
+from app.models.sale import Sale
 from app.schemas.sale import BillRequest, SaleResponse
 from app.services.billing_service import complete_sale
 from app.services.invoice_service import generate_invoice_html
@@ -54,4 +55,18 @@ def get_invoice(
 ):
     """Get printable HTML invoice for a sale."""
     html = generate_invoice_html(db, sale_id, paper_format=format)
+    return HTMLResponse(content=html)
+
+
+@router.get("/public-invoice/{invoice_no}", response_class=HTMLResponse)
+def get_public_invoice(
+    invoice_no: str,
+    format: Optional[str] = Query("A4", description="Paper format: A4, A5, 58mm, 80mm"),
+    db: Session = Depends(get_db),
+):
+    """Public read-only BILL INVOICE for customers accessing from WhatsApp."""
+    sale = db.query(Sale).filter(Sale.invoice_no == invoice_no).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    html = generate_invoice_html(db, sale.id, paper_format=format)
     return HTMLResponse(content=html)

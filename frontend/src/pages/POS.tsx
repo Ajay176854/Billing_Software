@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
-import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, ShoppingCart, QrCode, PauseCircle, Clock, RotateCcw } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, ShoppingCart, QrCode, PauseCircle, Clock, RotateCcw, Share2 } from 'lucide-react';
 import { useGlobalScanner } from '../hooks/useGlobalScanner';
+import { openWhatsAppBill } from '../utils/whatsapp';
 
 interface CartItem {
   product_id: number;
@@ -21,6 +22,11 @@ interface CompletedSale {
   invoice_no: string;
   total: number;
   payment_method: string;
+  customer_name?: string;
+  customer_phone?: string;
+  items?: Array<{ name: string; quantity: number; price: number }>;
+  subtotal?: number;
+  discount?: number;
 }
 
 export interface HeldBill {
@@ -110,6 +116,8 @@ export default function POS() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerPlace, setCustomerPlace] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
+  const [printPaper, setPrintPaper] = useState(false);
   
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -346,6 +354,15 @@ export default function POS() {
       invoice_no: 'Saving bill...',
       total: currentTotal,
       payment_method: paymentMethod,
+      customer_name: savedCustomerName,
+      customer_phone: savedCustomerPhone,
+      items: currentCart.map((i) => ({
+        name: i.name || "Item",
+        quantity: i.quantity,
+        price: i.price * i.quantity - i.discount,
+      })),
+      subtotal: currentSubtotal,
+      discount: currentDiscount,
     });
 
     const savedCustomerName = customerName;
@@ -371,7 +388,7 @@ export default function POS() {
         customer_email: savedCustomerEmail || undefined,
       });
 
-      // 3. Print receipt with the confirmed official invoice number
+      // 3. Optional direct paper print (only if toggled by cashier)
       const receiptPayload = {
         invoice_no: res.data.invoice_no,
         items: currentCart.map((i) => ({
@@ -384,7 +401,28 @@ export default function POS() {
         total: currentTotal,
         payment_method: paymentMethod,
       };
-      directPrintReceipt(res.data.id, receiptPayload);
+
+      if (printPaper) {
+        directPrintReceipt(res.data.id, receiptPayload);
+      }
+
+      // 4. Instant WhatsApp invoice delivery
+      if (sendWhatsApp && savedCustomerPhone) {
+        openWhatsAppBill({
+          customerName: savedCustomerName,
+          customerPhone: savedCustomerPhone,
+          invoiceNo: res.data.invoice_no,
+          paymentMethod: paymentMethod,
+          items: currentCart.map((i) => ({
+            name: i.name || "Item",
+            quantity: i.quantity,
+            price: i.price * i.quantity - i.discount,
+          })),
+          subtotal: currentSubtotal,
+          discount: currentDiscount,
+          total: currentTotal,
+        });
+      }
 
       // Update dialog with official invoice number and ID
       setCompletedSale((prev) => prev ? {
@@ -396,6 +434,15 @@ export default function POS() {
         invoice_no: res.data.invoice_no,
         total: res.data.total,
         payment_method: res.data.payment_method,
+        customer_name: savedCustomerName,
+        customer_phone: savedCustomerPhone,
+        items: currentCart.map((i) => ({
+          name: i.name || "Item",
+          quantity: i.quantity,
+          price: i.price * i.quantity - i.discount,
+        })),
+        subtotal: currentSubtotal,
+        discount: currentDiscount,
       });
       toast.success(`Bill generated: ${res.data.invoice_no}`);
     } catch (err: any) {
@@ -980,6 +1027,33 @@ export default function POS() {
               )}
             </div>
 
+            {/* Delivery Mode Toggles (Save paper by default!) */}
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-bg-card p-3">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-primary select-none">
+                <input
+                  type="checkbox"
+                  checked={sendWhatsApp}
+                  onChange={(e) => setSendWhatsApp(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-500"
+                />
+                <span className="flex items-center gap-1.5 text-emerald-500 font-semibold text-xs sm:text-sm">
+                  📱 WhatsApp Bill
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-muted hover:text-text-primary select-none">
+                <input
+                  type="checkbox"
+                  checked={printPaper}
+                  onChange={(e) => setPrintPaper(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent cursor-pointer accent-indigo-500"
+                />
+                <span className="flex items-center gap-1 text-xs">
+                  <Printer className="h-3.5 w-3.5" /> Paper Print
+                </span>
+              </label>
+            </div>
+
             <button
               onClick={completeSale}
               disabled={processing || (paymentMethod === 'cash' && Number(cashReceived) > 0 && Number(cashReceived) < grandTotal)}
@@ -1002,20 +1076,46 @@ export default function POS() {
             <p className="mt-1 text-sm text-text-muted">Invoice: {completedSale.invoice_no}</p>
             <p className="mt-2 text-2xl font-bold text-success">{fmt(completedSale.total)}</p>
             <p className="mt-1 text-xs text-text-muted capitalize">Paid via {completedSale.payment_method}</p>
-            <div className="mt-6 flex gap-3">
+            <div className="mt-5 flex flex-col gap-2.5">
+              {/* Primary 1-Click WhatsApp Send */}
               <button
-                onClick={() => directPrintReceipt(completedSale.id, completedSale)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:text-accent"
+                onClick={() => {
+                  if (!completedSale.customer_phone) {
+                    toast.error("No customer phone number recorded");
+                    return;
+                  }
+                  openWhatsAppBill({
+                    customerName: completedSale.customer_name,
+                    customerPhone: completedSale.customer_phone,
+                    invoiceNo: completedSale.invoice_no,
+                    paymentMethod: completedSale.payment_method,
+                    items: completedSale.items || [],
+                    subtotal: completedSale.subtotal || completedSale.total,
+                    discount: completedSale.discount || 0,
+                    total: completedSale.total,
+                  });
+                  toast.success("Opening WhatsApp with Bill Invoice!");
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition-all hover:bg-emerald-500 active:scale-95"
               >
-                <Printer className="h-4 w-4" /> Reprint
+                <Share2 className="h-4 w-4" /> 📱 Send Bill on WhatsApp
               </button>
-              <button
-                autoFocus
-                onClick={() => { setCompletedSale(null); barcodeRef.current?.focus(); }}
-                className="bg-gradient-to-br from-indigo-600 to-indigo-500 flex-1 rounded-lg py-2.5 text-sm font-semibold text-white"
-              >
-                New Bill
-              </button>
+
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => directPrintReceipt(completedSale.id, completedSale)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-medium text-text-primary transition-colors hover:border-accent hover:text-accent"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print Paper
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => { setCompletedSale(null); barcodeRef.current?.focus(); }}
+                  className="flex flex-1 items-center justify-center rounded-lg bg-bg-secondary border border-border py-2 text-xs font-semibold text-text-primary hover:bg-bg-card"
+                >
+                  New Bill
+                </button>
+              </div>
             </div>
           </div>
         </div>

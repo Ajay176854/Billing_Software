@@ -4,8 +4,9 @@ import axios from 'axios';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Printer, XCircle } from 'lucide-react';
+import { ArrowLeft, Printer, XCircle, Share2 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { openWhatsAppBill } from '../utils/whatsapp';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
@@ -113,6 +114,33 @@ export default function InvoiceDetail() {
     }
   };
 
+  const shareOnWhatsApp = () => {
+    if (!sale) return;
+    if (!sale.customer_phone) {
+      toast.error('Customer phone number is missing on this invoice');
+      return;
+    }
+    const success = openWhatsAppBill({
+      customerName: sale.customer_name,
+      customerPhone: sale.customer_phone,
+      invoiceNo: sale.invoice_no,
+      createdAt: sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : undefined,
+      paymentMethod: sale.payment_method,
+      items: (sale.items || []).map((i: any) => ({
+        name: i.product_name || i.product?.name || "Item",
+        quantity: i.quantity,
+        price: i.subtotal,
+      })),
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      tax: sale.tax,
+      total: sale.total,
+    });
+    if (success) {
+      toast.success('Opening WhatsApp with Bill Invoice!');
+    }
+  };
+
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>;
   if (!sale) return null;
 
@@ -125,6 +153,13 @@ export default function InvoiceDetail() {
           <p className="text-sm text-text-muted">{sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : ''}</p>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={shareOnWhatsApp} 
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95"
+            title="Send E-Invoice directly via WhatsApp"
+          >
+            <Share2 className="h-4 w-4" /> 📱 WhatsApp Bill
+          </button>
           <button 
             onClick={printInvoice} 
             disabled={printing}
