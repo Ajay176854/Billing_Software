@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Printer, XCircle, Share2 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { openWhatsAppBill } from '../utils/whatsapp';
+import { dispatchWhatsAppBill } from '../utils/whatsapp';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
@@ -114,30 +114,36 @@ export default function InvoiceDetail() {
     }
   };
 
-  const shareOnWhatsApp = () => {
+  const [sharingWa, setSharingWa] = useState(false);
+
+  const shareOnWhatsApp = async () => {
     if (!sale) return;
     if (!sale.customer_phone) {
       toast.error('Customer phone number is missing on this invoice');
       return;
     }
-    const success = openWhatsAppBill({
-      customerName: sale.customer_name,
-      customerPhone: sale.customer_phone,
-      invoiceNo: sale.invoice_no,
-      createdAt: sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : undefined,
-      paymentMethod: sale.payment_method,
-      items: (sale.items || []).map((i: any) => ({
-        name: i.product_name || i.product?.name || "Item",
-        quantity: i.quantity,
-        price: i.subtotal,
-      })),
-      subtotal: sale.subtotal,
-      discount: sale.discount,
-      tax: sale.tax,
-      total: sale.total,
-    });
-    if (success) {
-      toast.success('Opening WhatsApp with Bill Invoice!');
+    setSharingWa(true);
+    try {
+      await dispatchWhatsAppBill({
+        customerName: sale.customer_name,
+        customerPhone: sale.customer_phone,
+        invoiceNo: sale.invoice_no,
+        createdAt: sale.created_at ? new Date(sale.created_at).toLocaleString('en-IN') : undefined,
+        paymentMethod: sale.payment_method,
+        items: (sale.items || []).map((i: any) => ({
+          name: i.product_name || i.product?.name || "Item",
+          quantity: i.quantity,
+          price: i.subtotal,
+        })),
+        subtotal: sale.subtotal,
+        discount: sale.discount,
+        tax: sale.tax,
+        total: sale.total,
+      });
+    } catch {
+      toast.error('Failed to dispatch WhatsApp bill');
+    } finally {
+      setSharingWa(false);
     }
   };
 
@@ -155,10 +161,11 @@ export default function InvoiceDetail() {
         <div className="flex gap-2">
           <button 
             onClick={shareOnWhatsApp} 
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95"
+            disabled={sharingWa}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
             title="Send E-Invoice directly via WhatsApp"
           >
-            <Share2 className="h-4 w-4" /> 📱 WhatsApp Bill
+            <Share2 className="h-4 w-4" /> {sharingWa ? 'Sending...' : '📱 WhatsApp Bill'}
           </button>
           <button 
             onClick={printInvoice} 

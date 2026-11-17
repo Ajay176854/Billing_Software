@@ -9,6 +9,8 @@ import json
 
 from app.auth import get_current_user
 
+from datetime import datetime
+
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
 SERVICE_URL = "http://127.0.0.1:3001/api/whatsapp"
@@ -67,12 +69,14 @@ def send_whatsapp(req: SendWhatsAppRequest, current_user=Depends(get_current_use
 @router.post("/send-test")
 def send_test_whatsapp(req: SendTestRequest, current_user=Depends(get_current_user)):
     """Send a test message to verify autonomous delivery."""
+    now_str = datetime.now().strftime("%d/%m/%Y, %I:%M %p")
     test_msg = (
-        "✨ *MOIRA LUXE BILLING SYSTEM* ✨\n"
+        "💎 *MOIRA LUXE BILLING SYSTEM* 💎\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "✅ *WhatsApp Connection Test Successful!*\n\n"
         "Your billing software is now autonomously connected to WhatsApp.\n"
-        "All customer bills will be automatically delivered here in real-time.\n\n"
-        "📅 Tested on: " + urllib.request.urlopen("http://worldtimeapi.org/api/timezone/Asia/Kolkata", timeout=1).geturl() if False else "17/11/2026\n"
+        "Customer bills will be dispatched in real-time.\n\n"
+        f"📅 Verified on: {now_str}\n"
         "✨ *Thank you!* ✨"
     )
     res = _call_service("send", method="POST", data={"phone": req.phone, "message": test_msg}, timeout=10.0)

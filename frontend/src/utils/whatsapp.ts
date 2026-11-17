@@ -44,7 +44,7 @@ export function buildWhatsAppBillText(data: WhatsAppBillData): string {
   const payMode = (data.paymentMethod || 'CASH').toUpperCase();
   const dateStr = data.createdAt || new Date().toLocaleString('en-IN', {
     day: '2-digit',
-    month: '2-digit',
+    month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
@@ -52,51 +52,46 @@ export function buildWhatsAppBillText(data: WhatsAppBillData): string {
   });
 
   const lines: string[] = [];
-  lines.push(`✨ *${storeName}* ✨`);
-  lines.push(`*BILL INVOICE*`);
-  lines.push(`--------------------------------`);
-  lines.push(`Dear *${customerName}*,`);
-  lines.push(`Thank you for shopping with us!`);
+  lines.push(`💎 *${storeName}* 💎`);
+  lines.push(`*OFFICIAL DIGITAL BILL INVOICE*`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`👤 *Billed To:* ${customerName}`);
+  lines.push(`🧾 *Invoice No:* #${data.invoiceNo}`);
+  lines.push(`📅 *Date & Time:* ${dateStr}`);
+  lines.push(`💳 *Payment Mode:* ${payMode}  *(PAID ✅)*`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`🛍️ *ITEMS PURCHASED:*`);
   lines.push(``);
-  lines.push(`🧾 *Bill No:* ${data.invoiceNo}`);
-  lines.push(`📅 *Date:* ${dateStr}`);
-  lines.push(`💳 *Payment:* ${payMode}`);
-  lines.push(``);
-  lines.push(`*Items Purchased:*`);
 
-  data.items.forEach((item) => {
+  data.items.forEach((item, index) => {
     const qty = item.quantity || 1;
-    const name = item.name || 'Item';
-    const price = Number(item.price || 0).toFixed(2);
-    lines.push(`• ${qty}x ${name} - Rs. ${price}`);
+    const name = (item.name || 'Item').toUpperCase();
+    const price = Number(item.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    lines.push(`*${index + 1}. ${name}*`);
+    lines.push(`   Qty: ${qty}  |  Amount: ₹${price}`);
   });
 
   lines.push(``);
-  lines.push(`Subtotal: Rs. ${Number(data.subtotal || 0).toFixed(2)}`);
+  lines.push(`────────────────────────`);
+  lines.push(`Subtotal: ₹${Number(data.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
   if (data.discount && data.discount > 0) {
-    lines.push(`Total Discount: -Rs. ${Number(data.discount).toFixed(2)}`);
+    lines.push(`Total Discount: -₹${Number(data.discount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   }
 
   if (data.tax && data.tax > 0) {
-    lines.push(`GST / Tax: +Rs. ${Number(data.tax).toFixed(2)}`);
+    lines.push(`GST / Tax: +₹${Number(data.tax).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   }
 
-  lines.push(`*GRAND TOTAL: Rs. ${Number(data.total || 0).toFixed(2)}*`);
-  lines.push(`--------------------------------`);
-
-  // E-Invoice link (public web view)
-  const origin = window.location.origin;
-  const invoiceLink = `${origin}/api/billing/public-invoice/${encodeURIComponent(data.invoiceNo)}`;
-  lines.push(`📄 *View E-Invoice:*`);
-  lines.push(invoiceLink);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`💰 *GRAND TOTAL: ₹${Number(data.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📌 *Terms & Exchange Policy:*`);
+  lines.push(`• No cash refund on sold items.`);
   lines.push(``);
-
-  if (data.storeAddress || data.storePhone) {
-    const storeInfo = [data.storeAddress, data.storePhone ? `Ph: ${data.storePhone}` : ''].filter(Boolean).join(' | ');
-    lines.push(`📍 ${storeInfo}`);
-  }
-  lines.push(`✨ *Have a wonderful day!* ✨`);
+  lines.push(`📍 *MOIRA LUXE*, Thuckalay`);
+  lines.push(`📞 *Helpdesk / Inquiries:* +91 8438353504`);
+  lines.push(`✨ *Thank you for shopping with us! Visit again!* ✨`);
 
   return lines.join('\n');
 }
@@ -115,7 +110,7 @@ export function openWhatsAppBill(data: WhatsAppBillData): boolean {
 
   // Direct wa.me link seamlessly opens WhatsApp Desktop or WhatsApp Web
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
-  
+
   if ((window as any).pywebview?.api?.open_external) {
     (window as any).pywebview.api.open_external(waUrl);
   } else {

@@ -4,7 +4,7 @@ import api from '../api/client';
 import toast from 'react-hot-toast';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, ShoppingCart, QrCode, PauseCircle, Clock, RotateCcw, Share2 } from 'lucide-react';
 import { useGlobalScanner } from '../hooks/useGlobalScanner';
-import { openWhatsAppBill, dispatchWhatsAppBill } from '../utils/whatsapp';
+import { dispatchWhatsAppBill } from '../utils/whatsapp';
 
 interface CartItem {
   product_id: number;
@@ -1121,12 +1121,12 @@ export default function POS() {
             <div className="mt-5 flex flex-col gap-2.5">
               {/* Primary 1-Click WhatsApp Send */}
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!completedSale.customer_phone) {
                     toast.error("No customer phone number recorded");
                     return;
                   }
-                  openWhatsAppBill({
+                  await dispatchWhatsAppBill({
                     customerName: completedSale.customer_name,
                     customerPhone: completedSale.customer_phone,
                     invoiceNo: completedSale.invoice_no,
@@ -1136,7 +1136,6 @@ export default function POS() {
                     discount: completedSale.discount || 0,
                     total: completedSale.total,
                   });
-                  toast.success("Opening WhatsApp with Bill Invoice!");
                 }}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition-all hover:bg-emerald-500 active:scale-95"
               >
